@@ -122,7 +122,7 @@ Termux and generic schemas), but for heavy use of custom tools, finetuning on
 |---|---|
 | Base | [Cactus-Compute/needle](https://huggingface.co/Cactus-Compute/needle) (26M, MIT) |
 | Finetune data | 4,810 synthetic examples: 16 Termux:API tools + 14 generic tools, no-tool and multi-call cases |
-| Format | f16 safetensors (52MB), upcast to f32 at load |
+| Format | f16 safetensors (52MB), upcast to f32 at load — stored in-repo as base64 parts (GitHub API limits); the installer reassembles + sha256-checks it |
 | Runtime | candle (CPU), single-threaded-friendly |
 
 Eval numbers, the finetuning recipe, and the data generator are in

@@ -1,3 +1,4 @@
 /target
 *.embcache
 *.log
+model/model.safetensors

@@ -21,6 +21,21 @@ say "building release binary (grab a coffee — 5-10 min on a phone)"
 cargo build --release
 
 # ── install ──────────────────────────────────────────────────────────────────
+
+# ── reassemble model weights (stored as base64 parts for GitHub API limits) ──
+if [ ! -f model/model.safetensors ] && ls model/model.safetensors.b64.part* >/dev/null 2>&1; then
+  say "reassembling model weights from base64 parts"
+  cat model/model.safetensors.b64.part* | base64 -d > model/model.safetensors
+  GOT=$(sha256sum model/model.safetensors | cut -d' ' -f1)
+  WANT="36443d27a663f2839e6f53c9b19bfa0b06c2e158d1c30819a4f6b6b87f887f24"
+  if [ "$GOT" != "$WANT" ]; then
+    say "checksum mismatch after reassembly — aborting (got $GOT)"
+    rm -f model/model.safetensors
+    exit 1
+  fi
+  say "model checksum OK"
+fi
+
 STING_HOME="${STING_HOME:-$HOME/.sting}"
 say "installing binary to \$PREFIX/bin/sting"
 install -m 755 target/release/sting "$PREFIX/bin/sting"
