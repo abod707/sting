@@ -5,9 +5,9 @@
 #   pip install -U huggingface_hub
 #   hf auth login          # paste a WRITE token from hf.co/settings/tokens
 # Then, from the sting repo root:
-#   ./scripts/hf-upload.sh [repo_id]     # default: abod707/needle-termux-sting
+#   ./scripts/hf-upload.sh [repo_id]     # default: gixnu/needle-termux-sting
 set -e
-REPO_ID="${1:-abod707/needle-termux-sting}"
+REPO_ID="${1:-gixnu/needle-termux-sting}"
 say() { printf "\033[1;35m[hf]\033[0m %s\n" "$*"; }
 
 reasm() { # $1=output path  $2=expected sha256
