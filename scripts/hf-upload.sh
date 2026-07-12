@@ -38,7 +38,12 @@ import sys
 from huggingface_hub import HfApi
 repo = sys.argv[1]
 api = HfApi()
-api.create_repo(repo, repo_type="model", exist_ok=True)
+try:
+    api.create_repo(repo, repo_type="model", exist_ok=True)
+except Exception as e:
+    # Fine-grained tokens scoped to a single existing repo can't call
+    # create_repo at all — that's fine if you created the repo in the web UI.
+    print(f"create_repo skipped ({type(e).__name__}) — assuming {repo} already exists")
 api.upload_folder(folder_path="hf_upload", repo_id=repo)
 print(f"\ndone: https://huggingface.co/{repo}")
 PY
