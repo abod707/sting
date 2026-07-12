@@ -1,0 +1,15 @@
+{
+  "vocab_size": 8192,
+  "d_model": 512,
+  "num_heads": 8,
+  "num_kv_heads": 4,
+  "num_encoder_layers": 12,
+  "num_decoder_layers": 8,
+  "rope_theta": 10000.0,
+  "max_seq_len": 1024,
+  "pad_token_id": 0,
+  "eos_token_id": 1,
+  "bos_token_id": 2,
+  "tool_call_token_id": 4,
+  "tools_token_id": 5
+}

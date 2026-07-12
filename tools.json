@@ -1,0 +1,131 @@
+{
+  "tools": [
+    {
+      "name": "termux_battery_status",
+      "description": "Get the battery status of the device: percentage, temperature, health and charging state.",
+      "parameters": {},
+      "exec": { "cmd": "termux-battery-status", "args": [] }
+    },
+    {
+      "name": "termux_torch",
+      "description": "Turn the device flashlight (torch) on or off.",
+      "parameters": {
+        "state": { "type": "string", "description": "Either on or off.", "required": true }
+      },
+      "exec": { "cmd": "termux-torch", "args": [ { "arg": "state" } ] }
+    },
+    {
+      "name": "termux_brightness",
+      "description": "Set the screen brightness of the device display.",
+      "parameters": {
+        "brightness": { "type": "integer", "description": "Brightness level from 0 to 255.", "required": true }
+      },
+      "exec": { "cmd": "termux-brightness", "args": [ { "arg": "brightness" } ] }
+    },
+    {
+      "name": "termux_vibrate",
+      "description": "Vibrate the device.",
+      "parameters": {
+        "duration_ms": { "type": "integer", "description": "Vibration duration in milliseconds.", "required": false }
+      },
+      "exec": { "cmd": "termux-vibrate", "args": [ { "arg": "duration_ms", "flag": "-d", "default": "1000" } ] }
+    },
+    {
+      "name": "termux_notification",
+      "description": "Display a system notification with a title and message body.",
+      "parameters": {
+        "title": { "type": "string", "description": "Notification title.", "required": true },
+        "content": { "type": "string", "description": "Notification body text.", "required": true }
+      },
+      "exec": { "cmd": "termux-notification", "args": [ { "arg": "title", "flag": "-t" }, { "arg": "content", "flag": "-c" } ] }
+    },
+    {
+      "name": "termux_toast",
+      "description": "Show a short transient popup (toast) message on screen.",
+      "parameters": {
+        "text": { "type": "string", "description": "Text to show in the toast.", "required": true }
+      },
+      "exec": { "cmd": "termux-toast", "args": [ { "arg": "text" } ] }
+    },
+    {
+      "name": "termux_clipboard_get",
+      "description": "Read the current contents of the system clipboard.",
+      "parameters": {},
+      "exec": { "cmd": "termux-clipboard-get", "args": [] }
+    },
+    {
+      "name": "termux_clipboard_set",
+      "description": "Set the contents of the system clipboard.",
+      "parameters": {
+        "text": { "type": "string", "description": "Text to place on the clipboard.", "required": true }
+      },
+      "exec": { "cmd": "termux-clipboard-set", "args": [ { "arg": "text" } ] }
+    },
+    {
+      "name": "termux_tts_speak",
+      "description": "Speak text out loud using the device text-to-speech engine.",
+      "parameters": {
+        "text": { "type": "string", "description": "Text to speak.", "required": true },
+        "language": { "type": "string", "description": "Language code such as en or ar.", "required": false }
+      },
+      "exec": { "cmd": "termux-tts-speak", "args": [ { "arg": "language", "flag": "-l" }, { "arg": "text" } ] }
+    },
+    {
+      "name": "termux_sensor",
+      "description": "Read values from a hardware sensor on the device.",
+      "parameters": {
+        "sensor": { "type": "string", "description": "Sensor name: accelerometer, gyroscope, light, proximity, pressure, magnetic_field or gravity.", "required": true },
+        "limit": { "type": "integer", "description": "Number of readings to take.", "required": false }
+      },
+      "exec": { "cmd": "termux-sensor", "args": [ { "arg": "sensor", "flag": "-s" }, { "arg": "limit", "flag": "-n", "default": "1" } ] }
+    },
+    {
+      "name": "termux_location",
+      "description": "Get the current geographic location of the device.",
+      "parameters": {
+        "provider": { "type": "string", "description": "Location provider: gps, network or passive.", "required": false },
+        "request": { "type": "string", "description": "Request type: once, last or updates.", "required": false }
+      },
+      "exec": { "cmd": "termux-location", "args": [ { "arg": "provider", "flag": "-p" }, { "arg": "request", "flag": "-r" } ] }
+    },
+    {
+      "name": "termux_wifi_connectioninfo",
+      "description": "Get information about the current wifi connection such as network name and signal.",
+      "parameters": {},
+      "exec": { "cmd": "termux-wifi-connectioninfo", "args": [] }
+    },
+    {
+      "name": "termux_volume",
+      "description": "Set the volume of an audio stream on the device.",
+      "parameters": {
+        "stream": { "type": "string", "description": "Audio stream: music, ring, alarm, notification, system or call.", "required": true },
+        "volume": { "type": "integer", "description": "Volume level from 0 to 15.", "required": true }
+      },
+      "exec": { "cmd": "termux-volume", "args": [ { "arg": "stream" }, { "arg": "volume" } ] }
+    },
+    {
+      "name": "termux_media_player",
+      "description": "Control media playback on the device: play a file, pause, stop or get info.",
+      "parameters": {
+        "action": { "type": "string", "description": "One of play, pause, stop or info.", "required": true },
+        "file": { "type": "string", "description": "Path of the media file to play.", "required": false }
+      },
+      "exec": { "cmd": "termux-media-player", "args": [ { "arg": "action" }, { "arg": "file", "optional": true } ] }
+    },
+    {
+      "name": "termux_download",
+      "description": "Download a file from a URL using the system download manager.",
+      "parameters": {
+        "url": { "type": "string", "description": "URL of the file to download.", "required": true },
+        "title": { "type": "string", "description": "Title to show for the download.", "required": false }
+      },
+      "exec": { "cmd": "termux-download", "args": [ { "arg": "title", "flag": "-t" }, { "arg": "url" } ] }
+    },
+    {
+      "name": "termux_camera_info",
+      "description": "Get information about the cameras available on the device.",
+      "parameters": {},
+      "exec": { "cmd": "termux-camera-info", "args": [] }
+    }
+  ]
+}

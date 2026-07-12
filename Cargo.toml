@@ -1,0 +1,25 @@
+[package]
+name = "sting"
+version = "0.1.0"
+edition = "2021"
+description = "Tiny on-device function-calling assistant for Termux, powered by a finetuned Needle (26M) model"
+license = "MIT"
+
+[dependencies]
+# Inference engine: pure-Rust tensor ops (CPU, NEON-accelerated on aarch64)
+candle-core = "0.9"
+# JSON for tool schemas, model config, and the model's tool-call output
+serde = { version = "1", features = ["derive"] }
+# preserve_order: tool schema JSON must serialize in file order so the
+# model sees byte-identical prompts to the reference implementation
+serde_json = { version = "1", features = ["preserve_order"] }
+# Ergonomic error handling (see Rust Book ch. 9 — this builds on Result<T, E>)
+anyhow = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+[[bin]]
+name = "sting"
+path = "src/main.rs"
