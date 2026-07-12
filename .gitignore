@@ -2,3 +2,5 @@
 *.embcache
 *.log
 model/model.safetensors
+model/needle_sting_final.pkl
+hf_upload/
