@@ -116,6 +116,27 @@ The model generalizes to unseen tools reasonably well (it was trained on a mix o
 Termux and generic schemas), but for heavy use of custom tools, finetuning on
 ~120 examples per tool gives the best results — see `finetune/README.md`.
 
+## For AI agents
+
+sting doubles as a deterministic device-control skill for bigger agents — a
+local LLM running in Termux, or anything that can shell out. The big model
+does the reasoning; sting turns one line of intent into exact, validated
+termux-api argv. No flag hallucinations (constrained decoding can't emit a
+flag that doesn't exist), no prompt bloat, ~1-2s on CPU, fully offline.
+
+`scripts/sting_tool.py` wraps the CLI in a JSON contract:
+
+```bash
+python3 scripts/sting_tool.py "turn on the flashlight"           # plan only
+# {"ok":true,"calls":[{"name":"termux_torch","arguments":{"state":"on"}}],...}
+python3 scripts/sting_tool.py --execute "vibrate for 2 seconds"  # act
+python3 scripts/sting_tool.py --list-tools
+```
+
+Plan mode never executes anything. An empty `calls` list is meaningful — the
+query matched no available tool or was missing required info — so surface it
+to the user instead of retrying. Full contract in the script docstring.
+
 ## Model
 
 | | |
