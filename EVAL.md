@@ -78,6 +78,11 @@ The candle/Rust port is verified against the JAX reference:
 - generation: **50/50** prompts produce byte-identical constrained greedy
   outputs (40 on the base checkpoint, 10 on the shipped finetuned one)
 
+To guard against regressions across future changes, `scripts/regression.sh`
+checks model output (40 queries × 3 modes) and tokenization (a stress corpus)
+byte-for-byte against committed goldens; `scripts/bench.sh` reports timing. See
+`scripts/README.md`.
+
 ## Timing (sandbox x86-64, 2 vCPU — expect different numbers on your phone)
 
 Measured after the KV-cache + tokenizer + softmax optimization pass (greedy
