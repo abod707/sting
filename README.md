@@ -152,13 +152,19 @@ to the user instead of retrying. Full contract in the script docstring.
 | Format | f16 safetensors (52MB), upcast to f32 at load — stored in-repo as base64 parts (GitHub API limits); the installer reassembles + sha256-checks it |
 | Runtime | candle (CPU), KV-cached decode |
 
-Performance knobs: the Termux installer builds with `RUSTFLAGS="-C
-target-cpu=native"` so the tensor kernels use your phone's exact CPU features;
-override `RUSTFLAGS` to change it. Prefill's heaviest step (the attention
-softmax) is parallelized across cores with rayon, and candle's matmuls
-parallelize too — set `RAYON_NUM_THREADS` to cap or raise the thread count.
-Prefill benefits most; per-token decode is small and stays effectively
-single-threaded.
+Performance knobs: the installer builds a **portable** binary (generic aarch64 /
+NEON). Prefill's heaviest step (the attention softmax) is parallelized across
+cores with rayon, and candle's matmuls parallelize too — set `RAYON_NUM_THREADS`
+to cap or raise the thread count. Prefill benefits most; per-token decode is
+small and stays effectively single-threaded.
+
+> **Don't force `-C target-cpu=native` on a phone.** It can make the compiler
+> emit instructions your core doesn't support and sting dies with *Illegal
+> instruction* (SIGILL) — common on big.LITTLE, where the build core and the
+> running core differ. The speedups here are algorithmic and don't need it. If
+> you know your CPU and want to try it:
+> `RUSTFLAGS="-C target-cpu=native" bash scripts/termux-install.sh` — and if it
+> SIGILLs, rebuild without it.
 
 Eval numbers, the finetuning recipe, and the data generator are in
 [`EVAL.md`](EVAL.md) and [`finetune/`](finetune/).
