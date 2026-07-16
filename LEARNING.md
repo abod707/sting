@@ -71,6 +71,11 @@ JSON. candle's `Tensor` methods are generic over dtypes; we pin f32.
 - `run_one` in main.rs — a closure capturing the model by shared borrow and the
   retriever by mutable borrow (hence `let mut run_one`).
 - Dot-product via `zip + map + sum` in retrieval.rs; argmax scan in generate.rs.
+- `softmax_last` in model.rs — the same per-row closure is fed to either
+  `chunks_mut` (serial) or rayon's `par_chunks_mut` (one row per core). Because
+  each row owns a disjoint `&mut [f32]` slice, the borrow checker proves the
+  parallel version is data-race-free at compile time — "fearless concurrency"
+  with no locks.
 
 ## Chapter 15 — Smart pointers (preview)
 candle `Tensor`s are `Arc`-backed: `.clone()` in `Weights::take` copies a

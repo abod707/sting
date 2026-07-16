@@ -80,15 +80,16 @@ The candle/Rust port is verified against the JAX reference:
 
 ## Timing (sandbox x86-64, 2 vCPU — expect different numbers on your phone)
 
-Measured after the KV-cache + tokenizer optimization pass (greedy outputs remain
-byte-identical to the numbers above — verified over the 50/50 parity set plus a
-3,820-line tokenizer corpus).
+Measured after the KV-cache + tokenizer + softmax optimization pass (greedy
+outputs remain byte-identical to the numbers above — verified over the 50/50
+parity set, a 3,820-line tokenizer corpus, and a 40-query × 3-mode A/B of the
+softmax rewrite).
 
 | stage | all 16 tools | retrieval top-6 |
 |---|---|---|
-| prefill | ~825 tok / 1.1-1.3s | ~300 tok / 0.25-0.30s |
+| prefill | ~825 tok / 0.8s | ~300 tok / 0.20s |
 | decode | ~120 tok/s | ~155-160 tok/s |
-| typical query end-to-end | 1.3-1.6s | **0.3-0.5s** |
+| typical query end-to-end | ~0.9-1.1s | **0.25-0.4s** |
 
 Decode is now roughly constant tok/s regardless of prompt size and output
 length. The worst case — a long non-ASCII value that decodes to ~116
@@ -111,3 +112,19 @@ grew with sequence length (~7-15 tok/s, degrading as output lengthened). Now:
   symbols, so a merge only rescans its two neighbors — vocabulary lookups drop
   from O(n²) to O(n) and the per-pair `format!` allocation is gone. Tokenizing
   the full 16-tool prompt fell from ~390ms to ~13ms.
+- **Fused, parallel softmax.** Profiling the prefill showed softmax was ~44% of
+  a full-prompt encode — exp over ~65M elements across 12 layers, and it does
+  *not* parallelize inside candle. Replacing candle's five separate (each
+  allocating) tensor ops with a single fused pass over the raw buffer, with
+  independent attention rows split across cores via rayon, roughly halved
+  prefill on 2 cores (all-tools ~1.24s → ~0.8s) and scales further with core
+  count. The per-row arithmetic is unchanged, so output stays byte-identical.
+
+### A note on matmul threading
+
+candle already asks `gemm` for `Parallelism::Rayon(num_cpus)` on CPU matmul, and
+honours `RAYON_NUM_THREADS`. On this 2-vCPU sandbox gemm still runs these
+matmul shapes serially (its own size/thread heuristic), so the win came from the
+softmax, not the matmuls. On a phone with more cores, gemm is more likely to
+parallelize the projection/attention matmuls too; cap or raise the pool with
+`RAYON_NUM_THREADS`.

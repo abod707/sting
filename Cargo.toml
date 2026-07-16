@@ -15,6 +15,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 # Ergonomic error handling (see Rust Book ch. 9 — this builds on Result<T, E>)
 anyhow = "1"
+# Data-parallelism for the fused softmax over attention rows. Same threadpool
+# candle's matmul uses; honors RAYON_NUM_THREADS. Already in the tree via candle.
+rayon = "1"
 
 [profile.release]
 lto = true
