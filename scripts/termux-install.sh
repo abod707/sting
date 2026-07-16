@@ -18,12 +18,15 @@ command -v cargo >/dev/null 2>&1 || {
 
 # ── build ────────────────────────────────────────────────────────────────────
 say "building release binary (grab a coffee — 5-10 min on a phone)"
-# target-cpu=native lets the tensor kernels use this phone's exact CPU features
-# (dotprod, fp16, etc. on top of the aarch64 NEON baseline). Safe here because
-# we build and run on the same device. Override by exporting RUSTFLAGS yourself.
-: "${RUSTFLAGS:=-C target-cpu=native}"
-export RUSTFLAGS
-say "RUSTFLAGS=$RUSTFLAGS"
+# Portable (generic aarch64 / NEON baseline) build by default. We deliberately
+# do NOT set `-C target-cpu=native`: on several Android/Termux devices —
+# especially big.LITTLE, where the build core and the running core differ — it
+# makes the compiler emit instructions a core doesn't support and sting dies
+# with "Illegal instruction" (SIGILL). The speedups here are algorithmic (KV
+# cache, fused parallel softmax) and don't need it. Advanced users who know
+# their CPU can still opt in by exporting it first, e.g.:
+#   RUSTFLAGS="-C target-cpu=native" bash scripts/termux-install.sh
+[ -n "${RUSTFLAGS:-}" ] && say "using RUSTFLAGS=$RUSTFLAGS"
 cargo build --release
 
 # ── install ──────────────────────────────────────────────────────────────────
