@@ -26,6 +26,17 @@ Everywhere: `let` bindings, shadowing (`src/tokenizer.rs` `normalize` re-binds
 - `src/generate.rs::TrieNode::insert` — a mutable borrow (`node`) that is
   re-assigned deeper into the tree each iteration. This is the "borrows can
   move through a structure" pattern.
+- `src/model.rs::Attention::self_step` — the KV cache is a `&mut Option<Tensor>`
+  per layer. `cache_k.take()` **moves** the old cached tensor out (leaving
+  `None`), we `Tensor::cat` the new column onto it, then write the grown tensor
+  back with `*cache_k = Some(...)`. Same `Option::take` move trick as the BPE
+  loop, one level up: you can't append to something you only borrowed, so you
+  take ownership, transform, and put it back.
+- `src/tokenizer.rs::bpe_segment` (rewrite) — instead of a `Vec<&Symbol>` linked
+  list (which would tangle the borrow checker with self-references), the live
+  symbols are threaded by **index** through `next`/`prev: Vec<usize>` with a
+  `usize::MAX` sentinel. Owning the strings in one `Vec` and linking by index is
+  the idiomatic Rust way around "linked lists fight the borrow checker."
 
 ## Chapter 5 — Structs
 `Opts` (main.rs), `Tool`/`ExecSpec` (tools.rs), `Tokenizer` (tokenizer.rs),

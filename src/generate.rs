@@ -337,17 +337,22 @@ pub fn generate(
 
     let t0 = std::time::Instant::now();
     let enc_out = model.encode(&enc_ids, dev)?;
+    // Cross-attention K/V depend only on the encoder output, so compute them
+    // once here (prefill-side work) rather than re-projecting the whole encoder
+    // output on every decoded token.
+    let mut cache = model.init_decode(&enc_out)?;
     let prefill_ms = t0.elapsed().as_millis();
 
     let mut constrainer = constrained.then(|| Constrainer::new(tools_json, tok));
 
-    // Decoder starts from [EOS]; the model emits <tool_call> then the JSON.
-    let mut dec_ids: Vec<u32> = vec![EOS_ID];
+    // Decoder starts from [EOS]; the model emits <tool_call> then the JSON. Each
+    // step feeds a single token; the KV cache holds all prior positions.
+    let mut token: u32 = EOS_ID;
     let mut generated: Vec<u32> = Vec::new();
 
     let t1 = std::time::Instant::now();
     for _ in 0..MAX_GEN_LEN - 1 {
-        let logits = model.decode_last_logits(&dec_ids, &enc_out, dev)?;
+        let logits = model.decode_step(&mut cache, token, dev)?;
         let mut logits: Vec<f32> = logits.to_vec1()?;
 
         // [Rust Book Ch. 6] Option<&mut T> + if let: borrow the constrainer
@@ -376,7 +381,7 @@ pub fn generate(
             break;
         }
         generated.push(next);
-        dec_ids.push(next);
+        token = next; // feed the freshly generated token on the next step
     }
     let decode_ms = t1.elapsed().as_millis();
 
