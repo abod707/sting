@@ -1,0 +1,43 @@
+the quick brown fox jumps over the lazy dog
+The Quick Brown Fox Jumps Over The Lazy Dog.
+a
+ab
+abc
+hello, world!
+  leading spaces
+trailing spaces
+multiple     internal     spaces
+	tab	separated	values
+mixedCASE camelCase snake_case SCREAMING_SNAKE kebab-case
+under_score_words and-dash-words and.dot.words
+Numbers: 0 1 12 123 1234 12345 3.14159 -42 +7 1e10 0xFF 1_000_000
+Dates 2026-07-16 and times 21:48:03 and versions v0.1.0 1.2.3-rc.1
+punctuation !@#$%^&*()_+-=[]{}|;':",.<>/?`~
+email user.name+tag@example.co.uk
+url https://github.com/abod707/sting/blob/main/src/model.rs#L42
+path /data/data/com.termux/files/usr/bin/sting
+{"name":"termux_torch","arguments":{"state":"on"}}
+[{"name":"termux_vibrate","arguments":{"duration_ms":2000}}]
+{"type":"object","properties":{"title":{"type":"string"}},"required":["title"]}
+fn main() -> Result<()> { let x: Vec<u32> = vec![1, 2, 3]; Ok(()) }
+let mut node = self.children.entry(ch).or_default();
+import json; print(json.dumps({"k": [1, 2, 3]}, indent=2))
+turn on the flashlight
+how much battery do I have left
+set brightness to 200 and vibrate for 2 seconds then notify me
+قل صباح الخير يا اصدقاء
+اقرأ حساس التسارع خمس مرات من فضلك
+شغّل المصباح ثم اهتز لمدة ثانيتين
+السلام عليكم ورحمة الله وبركاته
+中文字符测试 你好世界
+日本語のテキストとひらがなとカタカナ
+한국어 텍스트 테스트
+Ελληνικά γράμματα δοκιμή
+Кириллица тест проверка
+emoji party 😀🔥📱⚡️🚀🎉👍🏽
+combining accents café naïve résumé jalapeño Zürich
+mixed script hello مرحبا 你好 こんにちは 1234 🚀
+▁already has underscore ▁ marks
+supercalifragilisticexpialidocious antidisestablishmentarianism
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+word word word word word word word word word word word word

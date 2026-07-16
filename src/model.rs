@@ -286,11 +286,53 @@ impl Attention {
 }
 
 /// Numerically stable softmax over the last dim (max-subtracted).
+///
+/// Fused single pass over the raw f32 buffer instead of candle's five separate
+/// (each-allocating) tensor ops — max, sub, exp, sum, div. Rows are independent,
+/// so for the wide prefill case (thousands of attention rows) they run across
+/// cores via rayon; the arithmetic per row is unchanged. This is the dominant
+/// prefill cost (exp over ~65M elements for a full-prompt encode), and it does
+/// not parallelize inside candle, so this is where threading actually pays.
 fn softmax_last(x: &Tensor) -> Result<Tensor> {
-    let m = x.max_keepdim(D::Minus1)?;
-    let e = x.broadcast_sub(&m)?.exp()?;
-    let s = e.sum_keepdim(D::Minus1)?;
-    Ok(e.broadcast_div(&s)?)
+    use rayon::prelude::*;
+
+    let dims = x.dims().to_vec();
+    let last = *dims.last().context("softmax on a 0-d tensor")?;
+    if last == 0 {
+        return Ok(x.clone());
+    }
+    let x = x.contiguous()?;
+    let dev = x.device().clone();
+    let mut data = x.flatten_all()?.to_vec1::<f32>()?;
+
+    // per-row: subtract the row max, exponentiate, normalize by the row sum.
+    let row = |r: &mut [f32]| {
+        let mut m = f32::NEG_INFINITY;
+        for &v in r.iter() {
+            if v > m {
+                m = v;
+            }
+        }
+        let mut s = 0f32;
+        for v in r.iter_mut() {
+            let e = (*v - m).exp();
+            *v = e;
+            s += e;
+        }
+        for v in r.iter_mut() {
+            *v /= s;
+        }
+    };
+
+    // Parallelize only when there are enough rows to beat dispatch overhead —
+    // decode-time calls (a handful of rows) stay serial.
+    if data.len() / last >= 32 {
+        data.par_chunks_mut(last).for_each(row);
+    } else {
+        data.chunks_mut(last).for_each(row);
+    }
+
+    Ok(Tensor::from_vec(data, dims, &dev)?)
 }
 
 /// y = x @ W for W PRE-TRANSPOSED to (in, out) at load. candle matmul over the

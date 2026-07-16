@@ -47,6 +47,8 @@ struct Opts {
     /// shortlist size for tool retrieval; 0 disables retrieval
     top_k: usize,
     verify_tokenizer: Option<PathBuf>,
+    /// dev: encode each line of a file and print its token ids (regression aid)
+    tokenize: Option<PathBuf>,
 }
 
 fn usage() -> ! {
@@ -57,6 +59,7 @@ USAGE:
   sting [FLAGS] \"your request\"
   sting --repl [FLAGS]
   sting verify-tokenizer <parity.jsonl>
+  sting tokenize <file>        (dev: print token ids per line; regression aid)
 
 FLAGS:
   --tools <file>      tools config JSON (default: $STING_HOME/tools.json or ./tools.json)
@@ -86,6 +89,7 @@ fn parse_args() -> Opts {
         timing: false,
         top_k: 6,
         verify_tokenizer: None,
+        tokenize: None,
     };
     let mut args = std::env::args().skip(1);
     // [Rust Book Ch. 8] while let + iterator: consume args by hand so flags
@@ -111,6 +115,7 @@ fn parse_args() -> Opts {
             }
             "--time" => opts.timing = true,
             "verify-tokenizer" => opts.verify_tokenizer = args.next().map(PathBuf::from),
+            "tokenize" => opts.tokenize = args.next().map(PathBuf::from),
             "-h" | "--help" => usage(),
             s if s.starts_with('-') => {
                 eprintln!("unknown flag: {s}");
@@ -141,6 +146,10 @@ fn main() -> Result<()> {
 
     if let Some(parity_path) = &opts.verify_tokenizer {
         return verify_tokenizer(parity_path);
+    }
+
+    if let Some(dump_path) = &opts.tokenize {
+        return tokenize_file(&opts, dump_path);
     }
 
     let model_dir = resolve(opts.model_dir.clone(), "model", "model");
@@ -275,6 +284,30 @@ fn main() -> Result<()> {
         Some(q) => run_one(q),
         None => usage(),
     }
+}
+
+/// Dev tool: encode each line of `path` and print its token ids, space-joined,
+/// one line of output per input line. Deterministic, so a committed dump doubles
+/// as a tokenizer regression fixture (see scripts/regression.sh). Honors
+/// --model-dir / $STING_HOME for the tokenizer spec.
+fn tokenize_file(opts: &Opts, path: &std::path::Path) -> Result<()> {
+    let model_dir = resolve(opts.model_dir.clone(), "model", "model");
+    let tok = Tokenizer::from_spec_file(&model_dir.join("tokenizer_spec.json"))?;
+    let data = std::fs::read_to_string(path)
+        .with_context(|| format!("reading {}", path.display()))?;
+    let mut out = String::new();
+    for line in data.lines() {
+        let ids = tok.encode(line);
+        for (i, id) in ids.iter().enumerate() {
+            if i > 0 {
+                out.push(' ');
+            }
+            out.push_str(&id.to_string());
+        }
+        out.push('\n');
+    }
+    print!("{out}");
+    Ok(())
 }
 
 /// Dev tool: verify the pure-Rust tokenizer against Python SentencePiece.

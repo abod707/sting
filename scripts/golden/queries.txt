@@ -1,0 +1,40 @@
+turn on the flashlight
+turn off the torch
+how much battery do I have left
+is my phone charging
+vibrate for 2 seconds
+vibrate for 500 ms
+read the gyroscope, 5 readings
+read the accelerometer 3 times
+set brightness to 200
+set screen brightness to 30
+notify me with title 'Build done' and message 'compiled fine'
+send a notification saying meeting at 5pm
+set the music volume to 7
+lower the ringtone volume to 2
+copy hello world to the clipboard
+what's on my clipboard
+show a toast that says saved
+say good morning everyone out loud
+speak the text welcome home
+what is my current location
+get gps location
+show wifi connection info
+play the song track.mp3
+pause the media player
+download https://example.com/file.zip
+camera info for the front camera
+take a photo with camera 0
+what time is it in Tokyo
+قل صباح الخير يا اصدقاء
+اقرأ حساس التسارع ثلاث مرات
+شغل الفانوس
+اضبط السطوع على مئة
+中文 语音 播报 你好
+notify title 'Café' message 'naïve façade'
+set volume of alarm stream to maximum
+turn the flashlight on then vibrate
+vibrate the phone for one and a half seconds
+copy the emoji 🚀 to clipboard
+what is the capital of France
+tell me a joke

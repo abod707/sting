@@ -154,9 +154,11 @@ to the user instead of retrying. Full contract in the script docstring.
 
 Performance knobs: the Termux installer builds with `RUSTFLAGS="-C
 target-cpu=native"` so the tensor kernels use your phone's exact CPU features;
-override `RUSTFLAGS` to change it. candle's matmuls parallelize across cores —
-set `RAYON_NUM_THREADS` to cap or raise the thread count (prefill benefits most;
-per-token decode is small and stays effectively single-threaded).
+override `RUSTFLAGS` to change it. Prefill's heaviest step (the attention
+softmax) is parallelized across cores with rayon, and candle's matmuls
+parallelize too — set `RAYON_NUM_THREADS` to cap or raise the thread count.
+Prefill benefits most; per-token decode is small and stays effectively
+single-threaded.
 
 Eval numbers, the finetuning recipe, and the data generator are in
 [`EVAL.md`](EVAL.md) and [`finetune/`](finetune/).
