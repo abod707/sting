@@ -19,6 +19,11 @@ anyhow = "1"
 [profile.release]
 lto = true
 codegen-units = 1
+# Strip symbols: smaller binary to ship/build on a phone, no runtime cost.
+strip = true
+# Release default, kept explicit so an inherited profile can't lower it — the
+# tensor math wants full optimization.
+opt-level = 3
 
 [[bin]]
 name = "sting"

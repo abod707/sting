@@ -94,10 +94,26 @@ impl Rope {
         let out2 = (x2.broadcast_mul(&cos)? + x1.broadcast_mul(&sin)?)?;
         Ok(Tensor::cat(&[out1, out2], D::Minus1)?)
     }
+
+    /// Apply rotary embeddings to a single-position tensor x: (B, H, 1, head_dim)
+    /// at absolute position `pos`. Numerically identical to `apply` restricted to
+    /// row `pos` — used by the KV-cached incremental decoder.
+    fn apply_at(&self, x: &Tensor, pos: usize) -> Result<Tensor> {
+        let hd = x.dim(D::Minus1)?;
+        let half = hd / 2;
+        let cos = self.cos.i(pos..pos + 1)?.reshape((1, 1, 1, half))?;
+        let sin = self.sin.i(pos..pos + 1)?.reshape((1, 1, 1, half))?;
+        let x1 = x.narrow(D::Minus1, 0, half)?;
+        let x2 = x.narrow(D::Minus1, half, half)?;
+        let out1 = (x1.broadcast_mul(&cos)? - x2.broadcast_mul(&sin)?)?;
+        let out2 = (x2.broadcast_mul(&cos)? + x1.broadcast_mul(&sin)?)?;
+        Ok(Tensor::cat(&[out1, out2], D::Minus1)?)
+    }
 }
 
-/// One attention module (self- or cross-). Weights are (out, in) — already
-/// transposed from flax at conversion time — so y = x @ W^T.
+/// One attention module (self- or cross-). Projection weights are stored
+/// PRE-TRANSPOSED to (in, out) at load (see `Weights::take_t`), so `linear`
+/// computes y = x @ W directly with no per-call transpose/copy.
 struct Attention {
     q_proj: Tensor,
     k_proj: Tensor,
@@ -113,10 +129,10 @@ struct Attention {
 impl Attention {
     fn load(w: &Weights, prefix: &str, cfg: &Config) -> Result<Self> {
         Ok(Self {
-            q_proj: w.take(&format!("{prefix}.q_proj.weight"))?,
-            k_proj: w.take(&format!("{prefix}.k_proj.weight"))?,
-            v_proj: w.take(&format!("{prefix}.v_proj.weight"))?,
-            out_proj: w.take(&format!("{prefix}.out_proj.weight"))?,
+            q_proj: w.take_t(&format!("{prefix}.q_proj.weight"))?,
+            k_proj: w.take_t(&format!("{prefix}.k_proj.weight"))?,
+            v_proj: w.take_t(&format!("{prefix}.v_proj.weight"))?,
+            out_proj: w.take_t(&format!("{prefix}.out_proj.weight"))?,
             q_norm: w.take(&format!("{prefix}.q_norm.scale"))?,
             k_norm: w.take(&format!("{prefix}.k_norm.scale"))?,
             num_heads: cfg.num_heads,
@@ -176,6 +192,97 @@ impl Attention {
         let out = out.transpose(1, 2)?.reshape((b, tq, self.num_heads * hd))?;
         linear(&out, &self.out_proj)
     }
+
+    /// Reshape a projected (1, T, H*hd) tensor to per-head (1, H, T, hd).
+    fn split_heads(&self, x: &Tensor, heads: usize) -> Result<Tensor> {
+        let (b, t, _) = x.dims3()?;
+        Ok(x.reshape((b, t, heads, self.head_dim))?.transpose(1, 2)?)
+    }
+
+    /// Precompute cross-attention K/V from the (fixed) encoder output — done
+    /// ONCE per query in `init_decode`, not per decoded token. Returns
+    /// `(k_t, v)` where k_t is pre-transposed to (1, H, hd, Tenc) for the score
+    /// matmul and v is (1, H, Tenc, hd). No RoPE on cross-attention.
+    fn cross_kv(&self, kv_input: &Tensor) -> Result<(Tensor, Tensor)> {
+        let k = self.split_heads(&linear(kv_input, &self.k_proj)?, self.num_kv_heads)?;
+        let v = self.split_heads(&linear(kv_input, &self.v_proj)?, self.num_kv_heads)?;
+        let k = zcrms_norm(&k, &self.k_norm)?;
+        let repeats = self.num_heads / self.num_kv_heads;
+        let (k, v) = if repeats > 1 {
+            (repeat_kv(&k, repeats)?, repeat_kv(&v, repeats)?)
+        } else {
+            (k, v)
+        };
+        Ok((k.transpose(2, 3)?.contiguous()?, v.contiguous()?))
+    }
+
+    /// Single-token cross-attention against precomputed encoder K/V.
+    /// q_input: (1, 1, d) -> (1, 1, d).
+    fn cross_step(&self, q_input: &Tensor, k_t: &Tensor, v: &Tensor) -> Result<Tensor> {
+        let (b, tq, _d) = q_input.dims3()?; // tq == 1
+        let q = self.split_heads(&linear(q_input, &self.q_proj)?, self.num_heads)?;
+        let q = zcrms_norm(&q, &self.q_norm)?.contiguous()?; // (1,H,1,hd)
+        let scale = (self.head_dim as f64).sqrt();
+        let scores = (q.matmul(k_t)? / scale)?; // (1,H,1,Tenc)
+        let probs = softmax_last(&scores)?;
+        let out = probs.matmul(v)?; // (1,H,1,hd)
+        let out = out.transpose(1, 2)?.reshape((b, tq, self.num_heads * self.head_dim))?;
+        linear(&out, &self.out_proj)
+    }
+
+    /// Single-token self-attention with an incremental KV cache. Computes Q/K/V
+    /// for just the new token at absolute position `pos`, appends its K/V to the
+    /// per-layer cache, and attends over the whole cache. No causal mask is
+    /// needed: a lone query at the end legitimately sees every cached key.
+    /// `cache_k` holds K pre-transposed as (1, H, hd, T); `cache_v` holds V as
+    /// (1, H, T, hd). q_input: (1, 1, d) -> (1, 1, d).
+    fn self_step(
+        &self,
+        q_input: &Tensor,
+        rope: &Rope,
+        pos: usize,
+        cache_k: &mut Option<Tensor>,
+        cache_v: &mut Option<Tensor>,
+    ) -> Result<Tensor> {
+        let (b, tq, _d) = q_input.dims3()?; // tq == 1
+        let q = self.split_heads(&linear(q_input, &self.q_proj)?, self.num_heads)?;
+        let k = self.split_heads(&linear(q_input, &self.k_proj)?, self.num_kv_heads)?;
+        let v = self.split_heads(&linear(q_input, &self.v_proj)?, self.num_kv_heads)?;
+        let q = zcrms_norm(&q, &self.q_norm)?;
+        let k = zcrms_norm(&k, &self.k_norm)?;
+        let repeats = self.num_heads / self.num_kv_heads;
+        let (k, v) = if repeats > 1 {
+            (repeat_kv(&k, repeats)?, repeat_kv(&v, repeats)?)
+        } else {
+            (k, v)
+        };
+        // RoPE at the token's absolute position (matches the full-sequence path).
+        let q = rope.apply_at(&q, pos)?.contiguous()?; // (1,H,1,hd)
+        let k = rope.apply_at(&k, pos)?;
+        let k_t = k.transpose(2, 3)?.contiguous()?; // (1,H,hd,1)
+        let v = v.contiguous()?; // (1,H,1,hd)
+
+        // Append the new token's K/V to the running cache.
+        let new_k = match cache_k.take() {
+            Some(prev) => Tensor::cat(&[&prev, &k_t], 3)?, // grow along hd's time axis
+            None => k_t,
+        };
+        let new_v = match cache_v.take() {
+            Some(prev) => Tensor::cat(&[&prev, &v], 2)?,
+            None => v,
+        };
+
+        let scale = (self.head_dim as f64).sqrt();
+        let scores = (q.matmul(&new_k)? / scale)?; // (1,H,1,T)
+        let probs = softmax_last(&scores)?;
+        let out = probs.matmul(&new_v)?; // (1,H,1,hd)
+        let out = out.transpose(1, 2)?.reshape((b, tq, self.num_heads * self.head_dim))?;
+        let y = linear(&out, &self.out_proj)?;
+
+        *cache_k = Some(new_k);
+        *cache_v = Some(new_v);
+        Ok(y)
+    }
 }
 
 /// Numerically stable softmax over the last dim (max-subtracted).
@@ -186,13 +293,14 @@ fn softmax_last(x: &Tensor) -> Result<Tensor> {
     Ok(e.broadcast_div(&s)?)
 }
 
-/// y = x @ W^T for W stored as (out, in). candle matmul over the last 2 dims.
+/// y = x @ W for W PRE-TRANSPOSED to (in, out) at load. candle matmul over the
+/// last 2 dims. No per-call transpose or contiguous copy of the weight.
 fn linear(x: &Tensor, w: &Tensor) -> Result<Tensor> {
     let (b, t, d_in) = x.dims3()?;
-    let d_out = w.dim(0)?;
+    let d_out = w.dim(1)?;
     let y = x
         .reshape((b * t, d_in))?
-        .matmul(&w.t()?.contiguous()?)?
+        .matmul(w)?
         .reshape((b, t, d_out))?;
     Ok(y)
 }
@@ -250,6 +358,13 @@ impl Weights {
             .cloned() // candle Tensors are cheap Arc clones (see Rust Book ch. 15)
             .with_context(|| format!("missing tensor {name}"))
     }
+    /// Take a projection matrix stored as (out, in) and return it PRE-TRANSPOSED
+    /// to (in, out), contiguous. `linear` then multiplies by it directly, so the
+    /// per-call `w.t()?.contiguous()?` (a transpose + full copy on every matmul,
+    /// every layer, every token) is paid once here at load instead.
+    fn take_t(&self, name: &str) -> Result<Tensor> {
+        Ok(self.take(name)?.t()?.contiguous()?)
+    }
     fn scalar(&self, name: &str) -> Result<f32> {
         let t = self.take(name)?;
         Ok(t.reshape(())?.to_scalar::<f32>()?)
@@ -271,13 +386,25 @@ pub struct Model {
 }
 
 struct ContrastiveHead {
-    hidden_w: Tensor, // (d_model/4, d_model)
+    hidden_w: Tensor, // PRE-TRANSPOSED to (d_model, d_model/4)
     hidden_b: Tensor, // (d_model/4,)
-    proj_w: Tensor,   // (contrastive_dim, d_model/4)
+    proj_w: Tensor,   // PRE-TRANSPOSED to (d_model/4, contrastive_dim)
 }
 
 fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())
+}
+
+/// Per-query decoder state for KV-cached generation. Cross-attention K/V are
+/// computed once from the encoder output; self-attention K/V grow by one column
+/// per decoded token. Create with `Model::init_decode`, advance with
+/// `Model::decode_step`.
+pub struct KvCache {
+    self_k: Vec<Option<Tensor>>, // per layer, (1, H, hd, T) — pre-transposed
+    self_v: Vec<Option<Tensor>>, // per layer, (1, H, T, hd)
+    cross_k_t: Vec<Tensor>,      // per layer, (1, H, hd, Tenc) — pre-transposed
+    cross_v: Vec<Tensor>,        // per layer, (1, H, Tenc, hd)
+    pos: usize,                  // absolute position of the next token
 }
 
 impl Model {
@@ -325,9 +452,11 @@ impl Model {
             w.take("contrastive_hidden.bias"),
             w.take("contrastive_proj.weight"),
         ) {
-            (Ok(hidden_w), Ok(hidden_b), Ok(proj_w)) => {
-                Some(ContrastiveHead { hidden_w, hidden_b, proj_w })
-            }
+            (Ok(hidden_w), Ok(hidden_b), Ok(proj_w)) => Some(ContrastiveHead {
+                hidden_w: hidden_w.t()?.contiguous()?,
+                hidden_b,
+                proj_w: proj_w.t()?.contiguous()?,
+            }),
             _ => None,
         };
 
@@ -358,9 +487,9 @@ impl Model {
             .context("model has no contrastive head (reconvert the checkpoint)")?;
         let enc = self.encode(ids, dev)?; // (1, T, d) final-normed
         let pooled = enc.mean(1)?; // (1, d)
-        let h = pooled.matmul(&head.hidden_w.t()?.contiguous()?)?; // (1, d/4)
+        let h = pooled.matmul(&head.hidden_w)?; // (1, d/4)  [weight pre-transposed]
         let h = h.broadcast_add(&head.hidden_b)?.relu()?;
-        let p = h.matmul(&head.proj_w.t()?.contiguous()?)?; // (1, cdim)
+        let p = h.matmul(&head.proj_w)?; // (1, cdim)  [weight pre-transposed]
         let v: Vec<f32> = p.squeeze(0)?.to_vec1()?;
         // safe L2 normalize: sqrt(sum^2 + 1e-12), matching the JAX reference
         let norm = (v.iter().map(|x| x * x).sum::<f32>() + 1e-12).sqrt();
@@ -386,24 +515,55 @@ impl Model {
         zcrms_norm(&x, &self.enc_final_norm)
     }
 
-    /// Run the decoder over `dec_ids` (full prefix, causal) attending to
-    /// `enc_out`. Returns logits for the LAST position: (vocab,).
-    pub fn decode_last_logits(&self, dec_ids: &[u32], enc_out: &Tensor, dev: &Device) -> Result<Tensor> {
-        let mut x = self.embed(dec_ids, dev)?;
+    /// Initialize decoder state for a query: precompute cross-attention K/V from
+    /// the encoder output once (they are constant across all decoded tokens).
+    pub fn init_decode(&self, enc_out: &Tensor) -> Result<KvCache> {
+        let n = self.dec_layers.len();
+        let mut cross_k_t = Vec::with_capacity(n);
+        let mut cross_v = Vec::with_capacity(n);
         for layer in &self.dec_layers {
+            let (k_t, v) = layer.cross_attn.cross_kv(enc_out)?;
+            cross_k_t.push(k_t);
+            cross_v.push(v);
+        }
+        Ok(KvCache {
+            self_k: (0..n).map(|_| None).collect(),
+            self_v: (0..n).map(|_| None).collect(),
+            cross_k_t,
+            cross_v,
+            pos: 0,
+        })
+    }
+
+    /// Advance the decoder by one token, returning logits for the NEXT position:
+    /// (vocab,). Runs O(1) work in the sequence length per call (aside from the
+    /// tiny KV-cache append) instead of reprocessing the whole prefix.
+    pub fn decode_step(&self, cache: &mut KvCache, token: u32, dev: &Device) -> Result<Tensor> {
+        let pos = cache.pos;
+        let mut x = self.embed(&[token], dev)?; // (1, 1, d)
+        for (i, layer) in self.dec_layers.iter().enumerate() {
             let normed = zcrms_norm(&x, &layer.norm1)?;
-            let attn = layer.self_attn.forward(&normed, &normed, Some(&self.rope), true)?;
+            let attn = layer.self_attn.self_step(
+                &normed,
+                &self.rope,
+                pos,
+                &mut cache.self_k[i],
+                &mut cache.self_v[i],
+            )?;
             x = (x + (attn * layer.self_gate as f64)?)?;
 
             let normed = zcrms_norm(&x, &layer.norm2)?;
-            let cross = layer.cross_attn.forward(&normed, enc_out, None, false)?;
+            let cross =
+                layer
+                    .cross_attn
+                    .cross_step(&normed, &cache.cross_k_t[i], &cache.cross_v[i])?;
             x = (x + (cross * layer.cross_gate as f64)?)?;
         }
-        let x = zcrms_norm(&x, &self.dec_final_norm)?; // (1, T, d)
-        let t = x.dim(1)?;
-        let last = x.i((0, t - 1))?; // (d,)
+        let x = zcrms_norm(&x, &self.dec_final_norm)?; // (1, 1, d)
+        let last = x.i((0, 0))?; // (d,)
         // tied output head: logits = h @ E^T  -> (vocab,)
         let logits = self.embedding.matmul(&last.unsqueeze(1)?)?.squeeze(1)?;
+        cache.pos += 1;
         Ok(logits)
     }
 }

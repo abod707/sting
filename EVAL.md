@@ -80,13 +80,34 @@ The candle/Rust port is verified against the JAX reference:
 
 ## Timing (sandbox x86-64, 2 vCPU — expect different numbers on your phone)
 
+Measured after the KV-cache + tokenizer optimization pass (greedy outputs remain
+byte-identical to the numbers above — verified over the 50/50 parity set plus a
+3,820-line tokenizer corpus).
+
 | stage | all 16 tools | retrieval top-6 |
 |---|---|---|
-| prefill | ~850 tok / 1.5-2.0s | ~300 tok / 0.24-0.40s |
-| decode | ~7 tok/s | ~13-15 tok/s |
-| typical query end-to-end | 4-8s | **1.5-2.5s** |
+| prefill | ~825 tok / 1.1-1.3s | ~300 tok / 0.25-0.30s |
+| decode | ~120 tok/s | ~155-160 tok/s |
+| typical query end-to-end | 1.3-1.6s | **0.3-0.5s** |
 
-Notes: decode recomputes the full prefix per token (no KV cache yet); typical
-answers are 15-30 tokens. Long non-ASCII string values (e.g. Arabic TTS text)
-decode via byte-fallback tokens and can take noticeably longer (~120 tokens for
-a short sentence). Both are known optimization targets.
+Decode is now roughly constant tok/s regardless of prompt size and output
+length. The worst case — a long non-ASCII value that decodes to ~116
+byte-fallback tokens (e.g. Arabic TTS text) — went from ~15s to ~1.1s
+(retrieval) and ~22s to ~2.3s (all-tools).
+
+### What changed vs. the pre-optimization port
+
+Before, decode recomputed the full prefix on every token (no KV cache), so cost
+grew with sequence length (~7-15 tok/s, degrading as output lengthened). Now:
+
+- **KV cache.** Self-attention K/V are cached and grown one token per step;
+  cross-attention K/V are computed once from the encoder output (they're
+  constant), instead of being re-projected over the whole prompt every step.
+  This is the ~12-15x decode win and it removes the per-step causal mask.
+- **Pre-transposed projection weights.** Weights are transposed to (in, out)
+  once at load, so each matmul skips a per-call transpose + copy (helps both
+  prefill and decode).
+- **BPE tokenizer.** Adjacent-pair scores are cached with a linked list of live
+  symbols, so a merge only rescans its two neighbors — vocabulary lookups drop
+  from O(n²) to O(n) and the per-pair `format!` allocation is gone. Tokenizing
+  the full 16-tool prompt fell from ~390ms to ~13ms.

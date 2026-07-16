@@ -18,6 +18,12 @@ command -v cargo >/dev/null 2>&1 || {
 
 # ── build ────────────────────────────────────────────────────────────────────
 say "building release binary (grab a coffee — 5-10 min on a phone)"
+# target-cpu=native lets the tensor kernels use this phone's exact CPU features
+# (dotprod, fp16, etc. on top of the aarch64 NEON baseline). Safe here because
+# we build and run on the same device. Override by exporting RUSTFLAGS yourself.
+: "${RUSTFLAGS:=-C target-cpu=native}"
+export RUSTFLAGS
+say "RUSTFLAGS=$RUSTFLAGS"
 cargo build --release
 
 # ── install ──────────────────────────────────────────────────────────────────

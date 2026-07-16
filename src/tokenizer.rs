@@ -189,59 +189,94 @@ impl Tokenizer {
         ids
     }
 
+    /// Merge score of the adjacent pair (`a`, `b`), or -inf if the concatenation
+    /// isn't a NORMAL vocabulary piece (i.e. not a legal merge). `buf` is reused
+    /// to avoid per-call allocation. Matches the reference: only type==1 pieces
+    /// merge, and a pair scoring -inf is treated as "no candidate" (never picked).
+    fn pair_score(&self, buf: &mut String, a: &str, b: &str) -> f32 {
+        buf.clear();
+        buf.push_str(a);
+        buf.push_str(b);
+        match self.piece_to_id.get(buf.as_str()) {
+            Some(&id) if self.types[id as usize] == 1 => self.scores[id as usize],
+            _ => f32::NEG_INFINITY,
+        }
+    }
+
     /// Score-greedy BPE over one text segment (SentencePiece BPE semantics:
     /// always merge the adjacent pair with the highest score; ties -> leftmost).
+    ///
+    /// Each adjacent-pair score is cached; a merge only invalidates the two pairs
+    /// touching the merge point, so vocabulary lookups are O(n) total instead of
+    /// the old O(n^2) (which also allocated a fresh String per pair per pass).
+    /// The left-to-right strict-greater scan below preserves the reference's
+    /// leftmost-on-ties tie-break exactly.
     fn bpe_segment(&self, text: &str, out: &mut Vec<u32>) {
-        // Working symbols as owned strings. A linked-list-ish Vec with tombstones
-        // keeps merging O(n * merges) — plenty fast for <1k-token inputs.
         let mut syms: Vec<Option<String>> = text.chars().map(|c| Some(c.to_string())).collect();
+        let n = syms.len();
+        if n == 0 {
+            return;
+        }
+
+        const NONE: usize = usize::MAX;
+        // Doubly linked list over live symbols (symbols only ever die, so indices
+        // are stable and order is preserved).
+        let mut next: Vec<usize> = (0..n).map(|i| i + 1).collect(); // next[n-1] == n
+        let mut prev: Vec<usize> = (0..n).map(|i| if i == 0 { NONE } else { i - 1 }).collect();
+        let mut pscore: Vec<f32> = vec![f32::NEG_INFINITY; n];
+        let mut buf = String::new();
+
+        // initial pair scores
+        for i in 0..n {
+            if next[i] < n {
+                let a = syms[i].as_deref().unwrap();
+                let b = syms[next[i]].as_deref().unwrap();
+                pscore[i] = self.pair_score(&mut buf, a, b);
+            }
+        }
 
         loop {
-            // find best-scoring adjacent pair
-            let mut best_score = f32::NEG_INFINITY;
-            let mut best_i: Option<usize> = None;
-            let mut i = 0;
-            while i < syms.len() {
-                if syms[i].is_none() {
-                    i += 1;
-                    continue;
+            // leftmost pair with the maximum score (strict > keeps the first).
+            let mut best = f32::NEG_INFINITY;
+            let mut best_i = NONE;
+            for i in 0..n {
+                if pscore[i] > best {
+                    best = pscore[i];
+                    best_i = i;
                 }
-                // find next live symbol after i
-                let mut j = i + 1;
-                while j < syms.len() && syms[j].is_none() {
-                    j += 1;
-                }
-                if j >= syms.len() {
-                    break;
-                }
-                let merged = format!("{}{}", syms[i].as_ref().unwrap(), syms[j].as_ref().unwrap());
-                if let Some(&id) = self.piece_to_id.get(&merged) {
-                    // only NORMAL pieces participate in merges
-                    if self.types[id as usize] == 1 {
-                        let score = self.scores[id as usize];
-                        if score > best_score {
-                            best_score = score;
-                            best_i = Some(i);
-                        }
-                    }
-                }
-                i = j;
+            }
+            if best_i == NONE {
+                break; // no mergeable pair left
             }
 
-            // [Rust Book Ch. 6] `if let` handles just the case we care about.
-            if let Some(i) = best_i {
-                let mut j = i + 1;
-                while syms[j].is_none() {
-                    j += 1;
-                }
-                // [Rust Book Ch. 4] `take()` MOVES the String out of the slot,
-                // leaving None behind — ownership transferred, no clone needed.
-                let right = syms[j].take().unwrap();
-                if let Some(left) = syms[i].as_mut() {
-                    left.push_str(&right);
-                }
+            let i = best_i;
+            let j = next[i];
+            // [Rust Book Ch. 4] `take()` MOVES the right string out; ownership
+            // transfers into the left symbol with no clone.
+            let right = syms[j].take().unwrap();
+            syms[i].as_mut().unwrap().push_str(&right);
+
+            // unlink j
+            let nj = next[j];
+            next[i] = nj;
+            if nj < n {
+                prev[nj] = i;
+            }
+            pscore[j] = f32::NEG_INFINITY;
+
+            // only the pairs (prev[i], i) and (i, next[i]) changed.
+            pscore[i] = if next[i] < n {
+                let a = syms[i].as_deref().unwrap();
+                let b = syms[next[i]].as_deref().unwrap();
+                self.pair_score(&mut buf, a, b)
             } else {
-                break; // no mergeable pair left
+                f32::NEG_INFINITY
+            };
+            let p = prev[i];
+            if p != NONE {
+                let a = syms[p].as_deref().unwrap();
+                let b = syms[i].as_deref().unwrap();
+                pscore[p] = self.pair_score(&mut buf, a, b);
             }
         }
 

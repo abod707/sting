@@ -48,7 +48,12 @@ No cloud, no server, no Python runtime on the phone. One binary + 52MB of weight
 
 - **Pure-Rust inference** via [candle](https://github.com/huggingface/candle) — the
   model architecture (encoder-decoder, zero feed-forward layers, GQA + RoPE,
-  gated residuals, ZCRMSNorm) is implemented in `src/model.rs` in ~400 lines.
+  gated residuals, ZCRMSNorm) is implemented in `src/model.rs`.
+- **KV-cached decoding**: self-attention K/V are cached and grown one token per
+  step, and cross-attention K/V are computed once from the encoder output (they
+  don't change during decoding). Decoding holds a steady ~120-160 tok/s on CPU
+  instead of reprocessing the whole prefix every token. See `EVAL.md` for the
+  before/after.
 - **Pure-Rust SentencePiece BPE tokenizer** (`src/tokenizer.rs`), verified
   token-for-token against the Python reference on 8,253 test strings.
 - **Tool retrieval**: the model's contrastive head embeds your query and every
@@ -122,7 +127,8 @@ sting doubles as a deterministic device-control skill for bigger agents — a
 local LLM running in Termux, or anything that can shell out. The big model
 does the reasoning; sting turns one line of intent into exact, validated
 termux-api argv. No flag hallucinations (constrained decoding can't emit a
-flag that doesn't exist), no prompt bloat, ~1-2s on CPU, fully offline.
+flag that doesn't exist), no prompt bloat, sub-second on CPU for a typical
+query (retrieval mode), fully offline.
 
 `scripts/sting_tool.py` wraps the CLI in a JSON contract:
 
@@ -144,7 +150,13 @@ to the user instead of retrying. Full contract in the script docstring.
 | Base | [Cactus-Compute/needle](https://huggingface.co/Cactus-Compute/needle) (26M, MIT) |
 | Finetune data | 4,810 synthetic examples: 16 Termux:API tools + 14 generic tools, no-tool and multi-call cases |
 | Format | f16 safetensors (52MB), upcast to f32 at load — stored in-repo as base64 parts (GitHub API limits); the installer reassembles + sha256-checks it |
-| Runtime | candle (CPU), single-threaded-friendly |
+| Runtime | candle (CPU), KV-cached decode |
+
+Performance knobs: the Termux installer builds with `RUSTFLAGS="-C
+target-cpu=native"` so the tensor kernels use your phone's exact CPU features;
+override `RUSTFLAGS` to change it. candle's matmuls parallelize across cores —
+set `RAYON_NUM_THREADS` to cap or raise the thread count (prefill benefits most;
+per-token decode is small and stays effectively single-threaded).
 
 Eval numbers, the finetuning recipe, and the data generator are in
 [`EVAL.md`](EVAL.md) and [`finetune/`](finetune/).
