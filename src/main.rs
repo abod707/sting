@@ -12,6 +12,7 @@
 //! Model files are looked up in --model-dir, $STING_HOME, or ./model.
 
 mod dispatch;
+mod error;
 mod generate;
 mod model;
 mod retrieval;
@@ -46,6 +47,8 @@ struct Opts {
     timing: bool,
     /// shortlist size for tool retrieval; 0 disables retrieval
     top_k: usize,
+    /// force f32 inference (default: bf16 for speed)
+    force_f32: bool,
     verify_tokenizer: Option<PathBuf>,
     /// dev: encode each line of a file and print its token ids (regression aid)
     tokenize: Option<PathBuf>,
@@ -70,7 +73,8 @@ FLAGS:
   --raw               print the model's JSON output only (no dispatch)
   --no-constrain      disable grammar-constrained decoding
   --top-k <n>         retrieval shortlist size (default 6; 0 = all tools)
-  --time              print prefill/decode timing"
+  --time              print prefill/decode timing
+  --f32               force f32 inference instead of bf16"
     );
     std::process::exit(2);
 }
@@ -88,6 +92,7 @@ fn parse_args() -> Opts {
         no_constrain: false,
         timing: false,
         top_k: 6,
+        force_f32: false,
         verify_tokenizer: None,
         tokenize: None,
     };
@@ -114,6 +119,7 @@ fn parse_args() -> Opts {
                     })
             }
             "--time" => opts.timing = true,
+            "--f32" => opts.force_f32 = true,
             "verify-tokenizer" => opts.verify_tokenizer = args.next().map(PathBuf::from),
             "tokenize" => opts.tokenize = args.next().map(PathBuf::from),
             "-h" | "--help" => usage(),
@@ -158,7 +164,7 @@ fn main() -> Result<()> {
     let dev = Device::Cpu;
     let t0 = std::time::Instant::now();
     let tok = Tokenizer::from_spec_file(&model_dir.join("tokenizer_spec.json"))?;
-    let model = Model::load(&model_dir, &dev)?;
+    let model = Model::load(&model_dir, &dev, opts.force_f32)?;
 
     // --tools-raw bypasses config parsing entirely (dev / parity testing)
     let (toolset, raw_tools_json) = match &opts.tools_raw_path {
@@ -223,34 +229,41 @@ fn main() -> Result<()> {
         }
 
         let calls = tools::parse_calls(&out, &name_map);
-        if calls.is_empty() {
-            let shown = if out.trim().is_empty() { "<empty>" } else { out.trim() };
-            println!("(no tool call — model output: {shown})");
-            return Ok(());
-        }
-
-        for call in &calls {
-            let args_json = serde_json::Value::Object(call.arguments.clone());
-            println!("→ {}({})", call.name, args_json);
-            let tool = match toolset.get(&call.name) {
-                Some(t) => t,
-                None => {
-                    println!("  (model chose a tool not in the config — skipping)");
-                    continue;
-                }
-            };
-            match dispatch::dispatch(tool, call, opts.dry_run, opts.assume_yes)? {
-                Outcome::Executed { argv, stdout, status } => {
-                    if status != 0 {
-                        eprintln!("  exit {status}: {}", argv.join(" "));
+        match calls {
+            tools::ParseResult::ParseError(e) => {
+                eprintln!("{e}");
+                return Ok(());
+            }
+            tools::ParseResult::NoCall => {
+                let shown = if out.trim().is_empty() { "<empty>" } else { out.trim() };
+                println!("(no tool call — model output: {shown})");
+                return Ok(());
+            }
+            tools::ParseResult::Calls(calls) => {
+                for call in &calls {
+                    let args_json = serde_json::Value::Object(call.arguments.clone());
+                    println!("→ {}({})", call.name, args_json);
+                    let tool = match toolset.get(&call.name) {
+                        Some(t) => t,
+                        None => {
+                            println!("  (model chose a tool not in the config — skipping)");
+                            continue;
+                        }
+                    };
+                    match dispatch::dispatch(tool, call, opts.dry_run, opts.assume_yes)? {
+                        Outcome::Executed { argv, stdout, status } => {
+                            if status != 0 {
+                                eprintln!("  exit {status}: {}", argv.join(" "));
+                            }
+                            if !stdout.is_empty() {
+                                println!("{stdout}");
+                            }
+                        }
+                        Outcome::DryRun { argv } => println!("  would run: {}", argv.join(" ")),
+                        Outcome::Declined => println!("  skipped."),
+                        Outcome::NoExec => println!("  (no exec mapping for this tool — call printed only)"),
                     }
-                    if !stdout.is_empty() {
-                        println!("{stdout}");
-                    }
                 }
-                Outcome::DryRun { argv } => println!("  would run: {}", argv.join(" ")),
-                Outcome::Declined => println!("  skipped."),
-                Outcome::NoExec => println!("  (no exec mapping for this tool — call printed only)"),
             }
         }
         Ok(())

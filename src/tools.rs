@@ -203,17 +203,28 @@ pub struct ToolCall {
     pub arguments: Map<String, Value>,
 }
 
+#[derive(Debug)]
+pub enum ParseResult {
+    Calls(Vec<ToolCall>),
+    NoCall,
+    ParseError(String),
+}
+
 /// Parse the model's output JSON into calls, mapping snake_case names back
 /// to the originals.
-pub fn parse_calls(output: &str, name_map: &HashMap<String, String>) -> Vec<ToolCall> {
-    let parsed: Value = match serde_json::from_str(output.trim()) {
+pub fn parse_calls(output: &str, name_map: &HashMap<String, String>) -> ParseResult {
+    let trimmed = output.trim();
+    if trimmed.is_empty() {
+        return ParseResult::NoCall;
+    }
+    let parsed: Value = match serde_json::from_str(trimmed) {
         Ok(v) => v,
-        Err(_) => return Vec::new(),
+        Err(e) => return ParseResult::ParseError(format!("model output is not valid JSON: {e}\nraw output: {output}")),
     };
     let arr = match parsed {
         Value::Array(a) => a,
         Value::Object(_) => vec![parsed],
-        _ => return Vec::new(),
+        _ => return ParseResult::NoCall,
     };
     let mut calls = Vec::new();
     for item in arr {
@@ -225,5 +236,120 @@ pub fn parse_calls(output: &str, name_map: &HashMap<String, String>) -> Vec<Tool
         let arguments = item["arguments"].as_object().cloned().unwrap_or_default();
         calls.push(ToolCall { name, arguments });
     }
-    calls
+    if calls.is_empty() {
+        ParseResult::NoCall
+    } else {
+        ParseResult::Calls(calls)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn to_snake_case_simple() {
+        assert_eq!(to_snake_case("TermuxBatteryStatus"), "termux_battery_status");
+        assert_eq!(to_snake_case("termux-battery-status"), "termux_battery_status");
+        assert_eq!(to_snake_case("simple"), "simple");
+    }
+
+    #[test]
+    fn to_snake_case_camel() {
+        assert_eq!(to_snake_case("camelCase"), "camel_case");
+        assert_eq!(to_snake_case("XMLParser"), "xml_parser");
+        assert_eq!(to_snake_case("parseXML"), "parse_xml");
+    }
+
+    #[test]
+    fn to_snake_case_collapse_underscores() {
+        assert_eq!(to_snake_case("a__b"), "a_b");
+        assert_eq!(to_snake_case("_leading_trailing_"), "leading_trailing");
+    }
+
+    #[test]
+    fn normalize_parameters_needle_style() {
+        let input = json!({"brightness": {"type": "integer", "description": "0-255", "required": true}});
+        let out = normalize_parameters(&input);
+        assert_eq!(out["brightness"]["type"], "integer");
+        assert_eq!(out["brightness"]["description"], "0-255");
+        assert_eq!(out["brightness"]["required"], true);
+    }
+
+    #[test]
+    fn normalize_parameters_mcp_style() {
+        let input = json!({
+            "type": "object",
+            "properties": {
+                "brightness": {"type": "integer", "description": "0-255"}
+            },
+            "required": ["brightness"]
+        });
+        let out = normalize_parameters(&input);
+        assert_eq!(out["brightness"]["type"], "integer");
+        assert_eq!(out["brightness"]["required"], true);
+    }
+
+    #[test]
+    fn parse_calls_valid_single() {
+        let name_map = HashMap::from([("flashlight".into(), "TermuxFlashlight".into())]);
+        let result = parse_calls(r#"[{"name":"flashlight","arguments":{"action":"on"}}]"#, &name_map);
+        match result {
+            ParseResult::Calls(calls) => {
+                assert_eq!(calls.len(), 1);
+                assert_eq!(calls[0].name, "TermuxFlashlight");
+                assert_eq!(calls[0].arguments["action"], "on");
+            }
+            other => panic!("expected Calls, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_calls_valid_object() {
+        let name_map = HashMap::from([("flashlight".into(), "TermuxFlashlight".into())]);
+        let result = parse_calls(r#"{"name":"flashlight","arguments":{"action":"on"}}"#, &name_map);
+        match result {
+            ParseResult::Calls(calls) => {
+                assert_eq!(calls.len(), 1);
+                assert_eq!(calls[0].name, "TermuxFlashlight");
+            }
+            other => panic!("expected Calls, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_calls_empty_array() {
+        let name_map = HashMap::new();
+        let result = parse_calls("[]", &name_map);
+        assert!(matches!(result, ParseResult::NoCall));
+    }
+
+    #[test]
+    fn parse_calls_empty_string() {
+        let name_map = HashMap::new();
+        let result = parse_calls("", &name_map);
+        assert!(matches!(result, ParseResult::NoCall));
+    }
+
+    #[test]
+    fn parse_calls_malformed_json() {
+        let name_map = HashMap::new();
+        let result = parse_calls("[{\"name\":\"test\"", &name_map);
+        assert!(matches!(result, ParseResult::ParseError(_)));
+    }
+
+    #[test]
+    fn parse_calls_null() {
+        let name_map = HashMap::new();
+        let result = parse_calls("null", &name_map);
+        assert!(matches!(result, ParseResult::NoCall));
+    }
+
+    #[test]
+    fn parse_calls_missing_name_field() {
+        let name_map = HashMap::new();
+        let result = parse_calls(r#"[{"arguments":{}}]"#, &name_map);
+        assert!(matches!(result, ParseResult::NoCall));
+    }
 }

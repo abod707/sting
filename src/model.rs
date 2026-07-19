@@ -48,7 +48,6 @@ fn zcrms_norm(x: &Tensor, scale: &Tensor) -> Result<Tensor> {
     let x2 = x.sqr()?.mean_keepdim(D::Minus1)?;
     let rms = (x2 + eps)?.sqrt()?;
     let one_plus = (scale + 1.0)?;
-    // broadcast: x / rms * (1 + scale)
     let normed = x.broadcast_div(&rms)?;
     Ok(normed.broadcast_mul(&one_plus)?)
 }
@@ -450,13 +449,12 @@ pub struct KvCache {
 }
 
 impl Model {
-    pub fn load(dir: &Path, dev: &Device) -> Result<Self> {
+    pub fn load(dir: &Path, dev: &Device, _force_f32: bool) -> Result<Self> {
         let cfg_raw = std::fs::read_to_string(dir.join("config.json"))
             .with_context(|| format!("reading {}/config.json", dir.display()))?;
         let cfg: Config = serde_json::from_str(&cfg_raw)?;
 
         let tensors = candle_core::safetensors::load(dir.join("model.safetensors"), dev)?;
-        // ensure f32
         let mut map = HashMap::new();
         for (k, v) in tensors {
             map.insert(k, v.to_dtype(DType::F32)?);

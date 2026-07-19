@@ -41,7 +41,10 @@ fn model_fingerprint(model_dir: &Path) -> String {
                 .unwrap_or(0);
             format!("{}:{}", m.len(), mtime)
         }
-        Err(_) => "unknown".into(),
+        Err(e) => {
+            eprintln!("[sting] cannot stat model file for cache fingerprint ({}): {}", p.display(), e);
+            "unknown".into()
+        }
     }
 }
 
@@ -62,10 +65,20 @@ impl Retriever {
     pub fn new(tools_path: &Path, model_dir: &Path) -> Self {
         let cache_path = PathBuf::from(format!("{}.embcache", tools_path.display()));
         let fp = model_fingerprint(model_dir);
-        let mut cache: Cache = std::fs::read_to_string(&cache_path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
+        let mut cache: Cache = match std::fs::read_to_string(&cache_path) {
+            Ok(s) => match serde_json::from_str(&s) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("[sting] embedding cache corrupt ({}), rebuilding", e);
+                    Cache::default()
+                }
+            },
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Cache::default(),
+            Err(e) => {
+                eprintln!("[sting] embedding cache unreadable ({}), rebuilding", e);
+                Cache::default()
+            }
+        };
         if cache.model_fp != fp {
             // model changed -> all embeddings stale
             cache = Cache { model_fp: fp, entries: Default::default() };
@@ -131,9 +144,13 @@ impl Retriever {
 
     fn save_if_dirty(&mut self) {
         if self.dirty {
-            if let Ok(json) = serde_json::to_string(&self.cache) {
-                // best-effort: a read-only FS just means we re-embed next run
-                let _ = std::fs::write(&self.cache_path, json);
+            match serde_json::to_string(&self.cache) {
+                Ok(json) => {
+                    if let Err(e) = std::fs::write(&self.cache_path, &json) {
+                        eprintln!("[sting] failed to write embedding cache ({}): {}", self.cache_path.display(), e);
+                    }
+                }
+                Err(e) => eprintln!("[sting] failed to serialize embedding cache: {}", e),
             }
             self.dirty = false;
         }

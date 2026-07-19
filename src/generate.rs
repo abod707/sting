@@ -85,7 +85,7 @@ impl TrieNode {
 // JSON state machine (port of constrained.py::JsonStateMachine)
 // ---------------------------------------------------------------------------
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 enum JsonState {
     Free,
     InName,
@@ -399,4 +399,142 @@ pub fn generate(
             decode_ms,
         },
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn trie_insert_and_walk() {
+        let mut trie = TrieNode::default();
+        trie.insert("flashlight");
+        trie.insert("flash");
+
+        assert!(trie.walk("flash").is_some());
+        assert!(trie.walk("flashlight").is_some());
+        assert!(trie.walk("xyz").is_none());
+    }
+
+    #[test]
+    fn trie_terminal_flag() {
+        let mut trie = TrieNode::default();
+        trie.insert("a");
+
+        let node = trie.walk("a").unwrap();
+        assert!(node.terminal);
+        assert!(trie.walk("").unwrap().children.contains_key(&'a'));
+    }
+
+    #[test]
+    fn trie_valid_continuation_exact_match() {
+        let mut trie = TrieNode::default();
+        trie.insert("on");
+
+        let node = trie.walk("").unwrap();
+        assert!(node.valid_continuation("on"));
+        assert!(!node.valid_continuation("off"));
+    }
+
+    #[test]
+    fn trie_valid_continuation_quote_ends_terminal() {
+        let mut trie = TrieNode::default();
+        trie.insert("on");
+
+        let node = trie.walk("on").unwrap();
+        assert!(node.terminal);
+        assert!(node.valid_continuation("\""));
+    }
+
+    #[test]
+    fn trie_valid_continuation_quote_fails_non_terminal() {
+        let mut trie = TrieNode::default();
+        trie.insert("on");
+
+        let node = trie.walk("o").unwrap();
+        assert!(!node.terminal);
+        assert!(!node.valid_continuation("\""));
+    }
+
+    #[test]
+    fn trie_valid_continuation_prefix() {
+        let mut trie = TrieNode::default();
+        trie.insert("flash");
+
+        let node = trie.walk("").unwrap();
+        assert!(node.valid_continuation("fla"));
+        assert!(!node.valid_continuation("flx"));
+    }
+
+    #[test]
+    fn state_machine_initial_free() {
+        let sm = StateMachine::new();
+        assert_eq!(sm.state, JsonState::Free);
+        assert!(sm.constrained_buf.is_empty());
+    }
+
+    #[test]
+    fn state_machine_enters_name_constraint() {
+        let mut sm = StateMachine::new();
+        sm.feed("\"name\":\"");
+        assert_eq!(sm.state, JsonState::InName);
+        assert!(sm.constrained_buf.is_empty());
+    }
+
+    #[test]
+    fn state_machine_collects_constrained_text() {
+        let mut sm = StateMachine::new();
+        sm.feed("\"name\":\"termux_flash");
+        assert_eq!(sm.state, JsonState::InName);
+        assert_eq!(sm.constrained_buf, "termux_flash");
+    }
+
+    #[test]
+    fn state_machine_exits_constrained_on_quote() {
+        let mut sm = StateMachine::new();
+        sm.feed("\"name\":\"termux_flashlight\"");
+        assert_eq!(sm.state, JsonState::Free);
+        assert_eq!(sm.current_function, "termux_flashlight");
+        assert!(sm.constrained_buf.is_empty());
+    }
+
+    #[test]
+    fn state_machine_enters_arg_key() {
+        let mut sm = StateMachine::new();
+        sm.feed("{\"name\":\"tool\",\"arguments\":{\"act");
+        assert_eq!(sm.state, JsonState::InArgKey);
+        assert_eq!(sm.constrained_buf, "act");
+    }
+
+    #[test]
+    fn state_machine_escaped_quote_in_string() {
+        let mut sm = StateMachine::new();
+        sm.feed("\"name\":\"test\",\"arguments\":{\"key\":\"val\\\"ue\"}");
+        assert_eq!(sm.state, JsonState::Free);
+    }
+
+    #[test]
+    fn state_machine_nested_struct_does_not_trigger_arg_key() {
+        let mut sm = StateMachine::new();
+        sm.feed("{\"name\":\"tool\",\"arguments\":{\"nested\":{\"key\":val}}");
+        assert_eq!(sm.state, JsonState::Free);
+    }
+
+    #[test]
+    fn build_encoder_input_truncation() {
+        // Create a minimal tokenizer for this test by using the actual one
+        // if available, else skip.
+        let spec_path = std::env::var("STING_HOME")
+            .map(|h| format!("{}/model/tokenizer_spec.json", h))
+            .unwrap_or_else(|_| "model/tokenizer_spec.json".into());
+        let tok = match Tokenizer::from_spec_file(std::path::Path::new(&spec_path)) {
+            Ok(t) => t,
+            Err(_) => return,
+        };
+
+        let long_query = "query".repeat(500);
+        let tools_json = "[]";
+        let ids = build_encoder_input(&tok, &long_query, tools_json);
+        assert!(ids.len() <= MAX_ENC_LEN);
+    }
 }

@@ -229,8 +229,8 @@ impl Tokenizer {
         // initial pair scores
         for i in 0..n {
             if next[i] < n {
-                let a = syms[i].as_deref().unwrap();
-                let b = syms[next[i]].as_deref().unwrap();
+                let a = syms[i].as_deref().expect("bpe invariant: live symbol at i");
+                let b = syms[next[i]].as_deref().expect("bpe invariant: live symbol at next[i]");
                 pscore[i] = self.pair_score(&mut buf, a, b);
             }
         }
@@ -253,8 +253,8 @@ impl Tokenizer {
             let j = next[i];
             // [Rust Book Ch. 4] `take()` MOVES the right string out; ownership
             // transfers into the left symbol with no clone.
-            let right = syms[j].take().unwrap();
-            syms[i].as_mut().unwrap().push_str(&right);
+            let right = syms[j].take().expect("bpe invariant: right neighbor is live");
+            syms[i].as_mut().expect("bpe invariant: left symbol is live after merge").push_str(&right);
 
             // unlink j
             let nj = next[j];
@@ -266,16 +266,16 @@ impl Tokenizer {
 
             // only the pairs (prev[i], i) and (i, next[i]) changed.
             pscore[i] = if next[i] < n {
-                let a = syms[i].as_deref().unwrap();
-                let b = syms[next[i]].as_deref().unwrap();
+                let a = syms[i].as_deref().expect("bpe rescorer: left symbol live");
+                let b = syms[next[i]].as_deref().expect("bpe rescorer: right symbol live");
                 self.pair_score(&mut buf, a, b)
             } else {
                 f32::NEG_INFINITY
             };
             let p = prev[i];
             if p != NONE {
-                let a = syms[p].as_deref().unwrap();
-                let b = syms[i].as_deref().unwrap();
+                let a = syms[p].as_deref().expect("bpe rescorer: prev symbol live");
+                let b = syms[i].as_deref().expect("bpe rescorer: current symbol live");
                 pscore[p] = self.pair_score(&mut buf, a, b);
             }
         }

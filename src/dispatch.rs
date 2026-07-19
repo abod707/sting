@@ -106,3 +106,156 @@ pub fn dispatch(tool: &Tool, call: &ToolCall, dry_run: bool, assume_yes: bool) -
         status: out.status.code().unwrap_or(-1),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Map;
+
+    fn make_exec(args: Vec<ArgTemplate>) -> Option<crate::tools::ExecSpec> {
+        Some(crate::tools::ExecSpec { cmd: "test-cmd".into(), args })
+    }
+
+    fn lit(s: &str) -> ArgTemplate {
+        ArgTemplate::Lit { lit: s.into() }
+    }
+
+    fn arg(name: &str) -> ArgTemplate {
+        ArgTemplate::Arg { arg: name.into(), flag: None, default: None, optional: false }
+    }
+
+    fn arg_default(name: &str, default: &str) -> ArgTemplate {
+        ArgTemplate::Arg { arg: name.into(), flag: None, default: Some(default.into()), optional: false }
+    }
+
+    fn arg_flag(name: &str, flag: &str) -> ArgTemplate {
+        ArgTemplate::Arg { arg: name.into(), flag: Some(flag.into()), default: None, optional: false }
+    }
+
+    fn arg_flag_default(name: &str, flag: &str, default: &str) -> ArgTemplate {
+        ArgTemplate::Arg { arg: name.into(), flag: Some(flag.into()), default: Some(default.into()), optional: false }
+    }
+
+    fn arg_optional(name: &str) -> ArgTemplate {
+        ArgTemplate::Arg { arg: name.into(), flag: None, default: None, optional: true }
+    }
+
+    fn tool(name: &str, exec: Option<crate::tools::ExecSpec>) -> crate::tools::Tool {
+        crate::tools::Tool {
+            name: name.into(),
+            description: String::new(),
+            parameters: Default::default(),
+            exec,
+        }
+    }
+
+    #[test]
+    fn build_argv_no_exec() {
+        let t = tool("test", None);
+        let call = crate::tools::ToolCall { name: "test".into(), arguments: Map::new() };
+        assert!(build_argv(&t, &call).unwrap().is_none());
+    }
+
+    #[test]
+    fn build_argv_simple_lit() {
+        let t = tool("test", make_exec(vec![lit("on")]));
+        let call = crate::tools::ToolCall { name: "test".into(), arguments: Map::new() };
+        let argv = build_argv(&t, &call).unwrap().unwrap();
+        assert_eq!(argv, vec!["test-cmd", "on"]);
+    }
+
+    #[test]
+    fn build_argv_supplied_arg() {
+        let mut args = Map::new();
+        args.insert("action".into(), serde_json::Value::String("on".into()));
+        let t = tool("test", make_exec(vec![arg("action")]));
+        let call = crate::tools::ToolCall { name: "test".into(), arguments: args };
+        let argv = build_argv(&t, &call).unwrap().unwrap();
+        assert_eq!(argv, vec!["test-cmd", "on"]);
+    }
+
+    #[test]
+    fn build_argv_flag_arg() {
+        let mut args = Map::new();
+        args.insert("title".into(), serde_json::Value::String("hello".into()));
+        let t = tool("test", make_exec(vec![arg_flag("title", "-t")]));
+        let call = crate::tools::ToolCall { name: "test".into(), arguments: args };
+        let argv = build_argv(&t, &call).unwrap().unwrap();
+        assert_eq!(argv, vec!["test-cmd", "-t", "hello"]);
+    }
+
+    #[test]
+    fn build_argv_missing_required() {
+        let t = tool("test", make_exec(vec![arg("action")]));
+        let call = crate::tools::ToolCall { name: "test".into(), arguments: Map::new() };
+        let err = build_argv(&t, &call).unwrap_err();
+        assert!(err.to_string().contains("missing required argument"));
+    }
+
+    #[test]
+    fn build_argv_default_value() {
+        let t = tool("test", make_exec(vec![arg_default("timeout", "30")]));
+        let call = crate::tools::ToolCall { name: "test".into(), arguments: Map::new() };
+        let argv = build_argv(&t, &call).unwrap().unwrap();
+        assert_eq!(argv, vec!["test-cmd", "30"]);
+    }
+
+    #[test]
+    fn build_argv_supplied_overrides_default() {
+        let mut args = Map::new();
+        args.insert("timeout".into(), serde_json::Value::String("60".into()));
+        let t = tool("test", make_exec(vec![arg_default("timeout", "30")]));
+        let call = crate::tools::ToolCall { name: "test".into(), arguments: args };
+        let argv = build_argv(&t, &call).unwrap().unwrap();
+        assert_eq!(argv, vec!["test-cmd", "60"]);
+    }
+
+    #[test]
+    fn build_argv_flag_with_default() {
+        let t = tool("test", make_exec(vec![arg_flag_default("lang", "-l", "en")]));
+        let call = crate::tools::ToolCall { name: "test".into(), arguments: Map::new() };
+        let argv = build_argv(&t, &call).unwrap().unwrap();
+        assert_eq!(argv, vec!["test-cmd", "-l", "en"]);
+    }
+
+    #[test]
+    fn build_argv_optional_skipped() {
+        let t = tool("test", make_exec(vec![arg_optional("file")]));
+        let call = crate::tools::ToolCall { name: "test".into(), arguments: Map::new() };
+        let argv = build_argv(&t, &call).unwrap().unwrap();
+        assert_eq!(argv, vec!["test-cmd"]);
+    }
+
+    #[test]
+    fn build_argv_optional_supplied() {
+        let mut args = Map::new();
+        args.insert("file".into(), serde_json::Value::String("test.txt".into()));
+        let t = tool("test", make_exec(vec![arg_optional("file")]));
+        let call = crate::tools::ToolCall { name: "test".into(), arguments: args };
+        let argv = build_argv(&t, &call).unwrap().unwrap();
+        assert_eq!(argv, vec!["test-cmd", "test.txt"]);
+    }
+
+    #[test]
+    fn build_argv_flag_optional_pair_absent() {
+        let t = tool("test", make_exec(vec![ArgTemplate::Arg {
+            arg: "lang".into(),
+            flag: Some("-l".into()),
+            default: None,
+            optional: true,
+        }]));
+        let call = crate::tools::ToolCall { name: "test".into(), arguments: Map::new() };
+        let argv = build_argv(&t, &call).unwrap().unwrap();
+        assert_eq!(argv, vec!["test-cmd"]);
+    }
+
+    #[test]
+    fn value_to_arg_string() {
+        assert_eq!(value_to_arg(&serde_json::Value::String("hello".into())), "hello");
+    }
+
+    #[test]
+    fn value_to_arg_number() {
+        assert_eq!(value_to_arg(&serde_json::json!(42)), "42");
+    }
+}
