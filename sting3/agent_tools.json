@@ -1,0 +1,256 @@
+[
+  {
+    "name": "termux_battery_status",
+    "description": "Get the battery status of the device: percentage, temperature, health and charging state.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "termux_torch",
+    "description": "Turn the device flashlight (torch) on or off.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "description": "Either on or off."
+        }
+      },
+      "required": [
+        "state"
+      ]
+    }
+  },
+  {
+    "name": "termux_brightness",
+    "description": "Set the screen brightness of the device display.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "brightness": {
+          "type": "integer",
+          "description": "Brightness level from 0 to 255."
+        }
+      },
+      "required": [
+        "brightness"
+      ]
+    }
+  },
+  {
+    "name": "termux_vibrate",
+    "description": "Vibrate the device.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "duration_ms": {
+          "type": "integer",
+          "description": "Vibration duration in milliseconds."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "termux_notification",
+    "description": "Display a system notification with a title and message body.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Notification title."
+        },
+        "content": {
+          "type": "string",
+          "description": "Notification body text."
+        }
+      },
+      "required": [
+        "title",
+        "content"
+      ]
+    }
+  },
+  {
+    "name": "termux_toast",
+    "description": "Show a short transient popup (toast) message on screen.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Text to show in the toast."
+        }
+      },
+      "required": [
+        "text"
+      ]
+    }
+  },
+  {
+    "name": "termux_clipboard_get",
+    "description": "Read the current contents of the system clipboard.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "termux_clipboard_set",
+    "description": "Set the contents of the system clipboard.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Text to place on the clipboard."
+        }
+      },
+      "required": [
+        "text"
+      ]
+    }
+  },
+  {
+    "name": "termux_tts_speak",
+    "description": "Speak text out loud using the device text-to-speech engine.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Text to speak."
+        },
+        "language": {
+          "type": "string",
+          "description": "Language code such as en or ar."
+        }
+      },
+      "required": [
+        "text"
+      ]
+    }
+  },
+  {
+    "name": "termux_sensor",
+    "description": "Read values from a hardware sensor on the device.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "sensor": {
+          "type": "string",
+          "description": "Sensor name: accelerometer, gyroscope, light, proximity, pressure, magnetic_field or gravity."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Number of readings to take."
+        }
+      },
+      "required": [
+        "sensor"
+      ]
+    }
+  },
+  {
+    "name": "termux_location",
+    "description": "Get the current geographic location of the device.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Location provider: gps, network or passive."
+        },
+        "request": {
+          "type": "string",
+          "description": "Request type: once, last or updates."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "termux_wifi_connectioninfo",
+    "description": "Get information about the current wifi connection such as network name and signal.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "termux_volume",
+    "description": "Set the volume of an audio stream on the device.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "stream": {
+          "type": "string",
+          "description": "Audio stream: music, ring, alarm, notification, system or call."
+        },
+        "volume": {
+          "type": "integer",
+          "description": "Volume level from 0 to 15."
+        }
+      },
+      "required": [
+        "stream",
+        "volume"
+      ]
+    }
+  },
+  {
+    "name": "termux_media_player",
+    "description": "Control media playback on the device: play a file, pause, stop or get info.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "One of play, pause, stop or info."
+        },
+        "file": {
+          "type": "string",
+          "description": "Path of the media file to play."
+        }
+      },
+      "required": [
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "termux_download",
+    "description": "Download a file from a URL using the system download manager.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "URL of the file to download."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title to show for the download."
+        }
+      },
+      "required": [
+        "url"
+      ]
+    }
+  },
+  {
+    "name": "termux_camera_info",
+    "description": "Get information about the cameras available on the device.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  }
+]

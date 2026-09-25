@@ -1,0 +1,889 @@
+{
+ "stats": {
+  "model": "engines/sting3-20L.cact",
+  "depth": "full",
+  "n": 40,
+  "name_acc": 0.775,
+  "exact": 0.6,
+  "parse_failures": 0,
+  "seconds": 126.8,
+  "label": "sting3-20L"
+ },
+ "rows": [
+  {
+   "query": "turn on the flashlight",
+   "expected": [
+    {
+     "name": "termux_torch",
+     "arguments": {
+      "state": "on"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_torch",
+     "arguments": {
+      "state": "on"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 0.821
+  },
+  {
+   "query": "turn off the torch",
+   "expected": [
+    {
+     "name": "termux_torch",
+     "arguments": {
+      "state": "off"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_torch",
+     "arguments": {
+      "state": "off"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 0.9727
+  },
+  {
+   "query": "how much battery do I have left",
+   "expected": [
+    {
+     "name": "termux_battery_status",
+     "arguments": {}
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_battery_status",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "is my phone charging",
+   "expected": [
+    {
+     "name": "termux_battery_status",
+     "arguments": {}
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_battery_status",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "vibrate for 2 seconds",
+   "expected": [
+    {
+     "name": "termux_vibrate",
+     "arguments": {
+      "duration_ms": 2000
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_vibrate",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": false,
+   "confidence": 1.0
+  },
+  {
+   "query": "vibrate for 500 ms",
+   "expected": [
+    {
+     "name": "termux_vibrate",
+     "arguments": {
+      "duration_ms": 500
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_vibrate",
+     "arguments": {
+      "duration_ms": 500
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "read the gyroscope, 5 readings",
+   "expected": [
+    {
+     "name": "termux_sensor",
+     "arguments": {
+      "sensor": "gyroscope",
+      "limit": 5
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_sensor",
+     "arguments": {
+      "sensor": "gyroscope",
+      "limit": 5
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "read the accelerometer 3 times",
+   "expected": [
+    {
+     "name": "termux_sensor",
+     "arguments": {
+      "sensor": "accelerometer",
+      "limit": 3
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_clipboard_get",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": false,
+   "exact_ok": false,
+   "confidence": 0.8544
+  },
+  {
+   "query": "set brightness to 200",
+   "expected": [
+    {
+     "name": "termux_brightness",
+     "arguments": {
+      "brightness": 200
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_brightness",
+     "arguments": {
+      "brightness": 2
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": false,
+   "confidence": 1.0
+  },
+  {
+   "query": "set screen brightness to 30",
+   "expected": [
+    {
+     "name": "termux_brightness",
+     "arguments": {
+      "brightness": 30
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_brightness",
+     "arguments": {
+      "brightness": 30
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "notify me with title 'Build done' and message 'compiled fine'",
+   "expected": [
+    {
+     "name": "termux_notification",
+     "arguments": {
+      "title": "Build done",
+      "content": "compiled fine"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_notification",
+     "arguments": {
+      "title": "Build done",
+      "content": "compiled fine"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 0.8975
+  },
+  {
+   "query": "send a notification saying meeting at 5pm",
+   "expected": [
+    {
+     "name": "termux_notification",
+     "arguments": {
+      "title": "meeting",
+      "content": "meeting at 5pm"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_notification",
+     "arguments": {
+      "title": "Meeting at 5pm",
+      "content": ""
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": false,
+   "confidence": 0.5726
+  },
+  {
+   "query": "set the music volume to 7",
+   "expected": [
+    {
+     "name": "termux_volume",
+     "arguments": {
+      "stream": "music",
+      "volume": 7
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_volume",
+     "arguments": {
+      "stream": "music",
+      "volume": 7
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 0.9884
+  },
+  {
+   "query": "lower the ringtone volume to 2",
+   "expected": [
+    {
+     "name": "termux_volume",
+     "arguments": {
+      "stream": "ring",
+      "volume": 2
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_volume",
+     "arguments": {
+      "stream": "ringtone",
+      "volume": 2
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": false,
+   "confidence": 1.0
+  },
+  {
+   "query": "copy hello world to the clipboard",
+   "expected": [
+    {
+     "name": "termux_clipboard_set",
+     "arguments": {
+      "text": "hello world"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_clipboard_set",
+     "arguments": {
+      "text": "hello world"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 0.6914
+  },
+  {
+   "query": "what's on my clipboard",
+   "expected": [
+    {
+     "name": "termux_clipboard_get",
+     "arguments": {}
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_clipboard_get",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "show a toast that says saved",
+   "expected": [
+    {
+     "name": "termux_toast",
+     "arguments": {
+      "text": "saved"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_toast",
+     "arguments": {
+      "text": "saved"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 0.9222
+  },
+  {
+   "query": "say good morning everyone out loud",
+   "expected": [
+    {
+     "name": "termux_tts_speak",
+     "arguments": {
+      "text": "good morning everyone"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_tts_speak",
+     "arguments": {
+      "text": "good morning everyone out loud"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": false,
+   "confidence": 0.4923
+  },
+  {
+   "query": "speak the text welcome home",
+   "expected": [
+    {
+     "name": "termux_tts_speak",
+     "arguments": {
+      "text": "welcome home"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_tts_speak",
+     "arguments": {
+      "text": "welcome home"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "what is my current location",
+   "expected": [
+    {
+     "name": "termux_location",
+     "arguments": {}
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_location",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 0.9888
+  },
+  {
+   "query": "get gps location",
+   "expected": [
+    {
+     "name": "termux_location",
+     "arguments": {
+      "provider": "gps"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_location",
+     "arguments": {
+      "provider": "gps"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "show wifi connection info",
+   "expected": [
+    {
+     "name": "termux_wifi_connectioninfo",
+     "arguments": {}
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_wifi_connectioninfo",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "play the song track.mp3",
+   "expected": [
+    {
+     "name": "termux_media_player",
+     "arguments": {
+      "action": "play",
+      "file": "track.mp3"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_media_player",
+     "arguments": {
+      "action": "play",
+      "file": "track.mp3"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "pause the media player",
+   "expected": [
+    {
+     "name": "termux_media_player",
+     "arguments": {
+      "action": "pause"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_media_player",
+     "arguments": {
+      "action": "pause"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "download https://example.com/file.zip",
+   "expected": [
+    {
+     "name": "termux_download",
+     "arguments": {
+      "url": "https://example.com/file.zip"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_download",
+     "arguments": {
+      "url": "https://example.com/file.zip"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "camera info for the front camera",
+   "expected": [
+    {
+     "name": "termux_camera_info",
+     "arguments": {}
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_camera_info",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 1.0
+  },
+  {
+   "query": "take a photo with camera 0",
+   "expected": [
+    {
+     "name": "termux_camera_info",
+     "arguments": {}
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_camera_info",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 0.8698
+  },
+  {
+   "query": "what time is it in Tokyo",
+   "expected": [],
+   "got": [],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 0.8536
+  },
+  {
+   "query": "tell me a joke",
+   "expected": [],
+   "got": [
+    {
+     "name": "termux_vibrate",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": false,
+   "exact_ok": false,
+   "confidence": 0.9544
+  },
+  {
+   "query": "what is the capital of France",
+   "expected": [],
+   "got": [
+    {
+     "name": "termux_location",
+     "arguments": {
+      "provider": "France",
+      "request": "capital"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": false,
+   "exact_ok": false,
+   "confidence": 0.8354
+  },
+  {
+   "query": "\u0642\u0644 \u0635\u0628\u0627\u062d \u0627\u0644\u062e\u064a\u0631 \u064a\u0627 \u0627\u0635\u062f\u0642\u0627\u0621",
+   "expected": [
+    {
+     "name": "termux_tts_speak",
+     "arguments": {
+      "text": "\u0635\u0628\u0627\u062d \u0627\u0644\u062e\u064a\u0631 \u064a\u0627 \u0627\u0635\u062f\u0642\u0627\u0621"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_location",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": false,
+   "exact_ok": false,
+   "confidence": 1.0
+  },
+  {
+   "query": "\u0627\u0642\u0631\u0623 \u062d\u0633\u0627\u0633 \u0627\u0644\u062a\u0633\u0627\u0631\u0639 \u062b\u0644\u0627\u062b \u0645\u0631\u0627\u062a",
+   "expected": [
+    {
+     "name": "termux_sensor",
+     "arguments": {
+      "sensor": "accelerometer",
+      "limit": 3
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_clipboard_get",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": false,
+   "exact_ok": false,
+   "confidence": 1.0
+  },
+  {
+   "query": "\u0634\u063a\u0644 \u0627\u0644\u0641\u0627\u0646\u0648\u0633",
+   "expected": [
+    {
+     "name": "termux_torch",
+     "arguments": {
+      "state": "on"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_location",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": false,
+   "exact_ok": false,
+   "confidence": 0.9895
+  },
+  {
+   "query": "\u0627\u0636\u0628\u0637 \u0627\u0644\u0633\u0637\u0648\u0639 \u0639\u0644\u0649 \u0645\u0626\u0629",
+   "expected": [
+    {
+     "name": "termux_brightness",
+     "arguments": {
+      "brightness": 100
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_clipboard_get",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": false,
+   "exact_ok": false,
+   "confidence": 1.0
+  },
+  {
+   "query": "\u4e2d\u6587 \u8bed\u97f3 \u64ad\u62a5 \u4f60\u597d",
+   "expected": [
+    {
+     "name": "termux_tts_speak",
+     "arguments": {
+      "text": "\u4f60\u597d"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_clipboard_get",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": false,
+   "exact_ok": false,
+   "confidence": 1.0
+  },
+  {
+   "query": "notify title 'Caf\u00e9' message 'na\u00efve fa\u00e7ade'",
+   "expected": [
+    {
+     "name": "termux_notification",
+     "arguments": {
+      "title": "Caf\u00e9",
+      "content": "na\u00efve fa\u00e7ade"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_notification",
+     "arguments": {
+      "title": "Caf\u00e9",
+      "content": "na\u00efve fa\u00e7ade"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 0.873
+  },
+  {
+   "query": "set volume of alarm stream to maximum",
+   "expected": [
+    {
+     "name": "termux_volume",
+     "arguments": {
+      "stream": "alarm",
+      "volume": 15
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_volume",
+     "arguments": {
+      "stream": "alarm",
+      "volume": 100
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": false,
+   "confidence": 1.0
+  },
+  {
+   "query": "turn the flashlight on then vibrate",
+   "expected": [
+    {
+     "name": "termux_torch",
+     "arguments": {
+      "state": "on"
+     }
+    },
+    {
+     "name": "termux_vibrate",
+     "arguments": {}
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_clipboard_set",
+     "arguments": {
+      "text": ""
+     }
+    },
+    {
+     "name": "termux_vibrate",
+     "arguments": {}
+    }
+   ],
+   "error": null,
+   "name_ok": false,
+   "exact_ok": false,
+   "confidence": 0.5604
+  },
+  {
+   "query": "vibrate the phone for one and a half seconds",
+   "expected": [
+    {
+     "name": "termux_vibrate",
+     "arguments": {
+      "duration_ms": 1500
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_vibrate",
+     "arguments": {
+      "duration_ms": 150
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": false,
+   "confidence": 0.9921
+  },
+  {
+   "query": "copy the emoji \ud83d\ude80 to clipboard",
+   "expected": [
+    {
+     "name": "termux_clipboard_set",
+     "arguments": {
+      "text": "\ud83d\ude80"
+     }
+    }
+   ],
+   "got": [
+    {
+     "name": "termux_clipboard_set",
+     "arguments": {
+      "text": "\ud83d\ude80"
+     }
+    }
+   ],
+   "error": null,
+   "name_ok": true,
+   "exact_ok": true,
+   "confidence": 0.8737
+  }
+ ]
+}
