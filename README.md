@@ -21,6 +21,15 @@ sting executes it (with your confirmation, or `--yes`).
 
 No cloud, no server, no Python runtime on the phone. One binary + 52MB of weights.
 
+## Needle 3 — see `sting3/`
+
+The same idea, one model generation later: [Needle 3](https://github.com/cactus-compute/needle)
+(8-29 MB, laddered, CQ2-quantised) fine-tuned on the same Termux:API tool set, driven through
+the shipped C engine instead of a hand-ported one. Base Needle 3 manages 70% name accuracy /
+55% exact match on this tool set unfinetuned; the LoRA rung is what makes it usable.
+
+Start at [`sting3/README.md`](sting3/README.md) and [`sting3/EVAL.md`](sting3/EVAL.md).
+
 ## How it works
 
 ```
